@@ -50,6 +50,8 @@ Perform packet capture of all traffic and dump to .pcap or stream back to anothe
 
 ## Help I used, thanks for all the go 
 
+I used Phind.com to backseat and induce both enough code and debug paranoia (AI and self) to speed things up and sure I am the right level of humbly bumbling though golang std. 
+
 https:www.digitalocean.com/community/tutorials/how-to-make-an-http-server-in-go
 https:www.digitalocean.com/community/tutorials/how-to-use-contexts-in-go
 https:drstearns.github.io/tutorials/goweb/

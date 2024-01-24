@@ -62,22 +62,18 @@ func (s *Server) setDefaultServerConfig() error {
 	return nil
 }
 
-func (s *Server) InitServerFromArgs(mhAssignedServerID int, ipAddressArg, hostnameStr, ifconfigArgStr, portArg, tlsArgsStr string) (err error) {
-        s.ServerInfo.Status = 1 // Initial phase checks
+func (s *Server) InitServerFromArgs(mhAssignedServerID int, serverTypeArg ipAddressArg, hostnameArgStr, ifconfigName, ifconfigCIDR, portArg, tlsArgsStr string) (err error) {
 	s.ServerID = mhAssignedServerID
-        s.ServerInfo.ServerAddr = util.CheckValidIP(ipAddressArg)
+	s.convServerTypeItoa()
+	s.ServerInfo.Status = 1 // Initial phase checks
+	s.ServerInfo.ServerAddr = util.CheckValidIP(ipAddressArg)
 	s.ServerInfo.ListeningPort = util.ConvertPortNumber(portArg) // Needs ":" prepended to the digits
-	s.convertServerTypeStrToInt()
 	hostnameSlice := strings.SplitN(hostnamesArgStr, ",", -1)
 	s.ServerInfo.Hostnames = append(hostnameSlice)
 	s.ServerInfo.TotalHostnames = len(hostnameSlice) - 1
-	ifconfig, err := net.InterfaceByName(ifconfigArgStr)
-	util.CheckError(err)
-	s.ServerInfo.ifconfigName = ifconfigArgStr
-	util.CheckError(err)
-	ifconfigCIDRTmp, err := util.ConvIfconfigNameToCIDR(ifconfig, ifconfigArgStr)
-	CheckError(err)
-	ifconfigCIDR = ifconfigCIDRTmp
+	s.ServerInfo.ifconfigName = ifconfigName
+
+	ifconfigCIDR = ifconfigCIDRArg
 
 	if tlsArgsStr != "" {
 		// if len(tlsArgsStr) != 0 {}
@@ -110,7 +106,7 @@ func (s *Server) InitTLSFromArgs() {
 	s.TLSInfo = tls
 }
 
-func (s *Server) convertServerTypeStrToInt(userArg string) error {
+func (s *Server) convServerTypeItoa(userArg string) error {
 	switch userArg {
 	case "http":
 		s.ServerType = 10
@@ -127,17 +123,18 @@ func (s *Server) convertServerTypeStrToInt(userArg string) error {
 // logging has to done somewhere
 func HandleArgs(args []string) error {
 	var consoleFlag int
-	
-        // Server Comand and flags
+	const correctTlsArgsCount int = 3
+
+	// Server Comand and flags
 	var ipAddress, netInterface, serverType, tlsInputStr, hostnamesStr string
-	var port int
+	var portInt int
 	serverCommand := flag.NewFlagSet("server", flag.ExitOnError)
 	serverCommand.StringVar(&tlsInputStr, "-t", "None", "Provide TLS information delimited by a comma - requires server type: -s https")
 	serverCommand.StringVar(&serverType, "-s", "http", "Provide a server of type: http, https")
 	serverCommand.StringVar(&netInterface, "-e", "localhost", "Provide a Network Interface - required!")
 	serverCommand.StringVar(&ipAddress, "-i", "127.0.0.1", "Provide a valid IPv4 address - required!")
 	serverCommand.StringVar(&hostnamesStr, "-H", "", "Provide DNS or vhosting alias comma delimited: dc.test.org,test.org")
-	serverCommand.IntVar(&port, "-p", 8443, "Provide a TCP port number - required!")
+	serverCommand.IntVar(&portInt, "-p", 8443, "Provide a TCP port number - required!")
 
 	// Console command and flags
 	consoleCommand := flag.NewFlagSet("console", flag.ExitOnError)
@@ -146,9 +143,7 @@ func HandleArgs(args []string) error {
 	flag.StringVar(&helpFlag, "-h", "Help", "Help")
 	flag.StringVar(&versionFlag, "-v", "Version", "Version")
 
-	if err := flag.Parse(args); err != nil {
-		return err
-	}
+	flag.Parse()
 	argsLen := len(args)
 
 	if argsLen > 1 {
@@ -156,7 +151,7 @@ func HandleArgs(args []string) error {
 		os.Exit(1)
 	}
 
-	if argsLen == 1 {
+	if argsLen < 2 {
 		if flag.Lookup(helpFlag) != nil {
 			flag.Usage()
 			os.Exit(1)
@@ -165,31 +160,85 @@ func HandleArgs(args []string) error {
 			flag.Usage()
 			os.Exit(1)
 		}
-		if flag.Lookup(consoleCommand) != nil {
-			consoleFlag = 1
-		}
+	} else {
+		fmt.Printf("Invalid command - either server or console")
+		flag.Usage()
+		os.Exit(1)
 	}
-	if flag.Lookup(serverCommand) == nil {
-		err := fmt.Errorf("Invalid command passed by user: %s", args)
+	var serverTypeArg, netInterfaceName, netInterfaceCDIR, ipAddressArg, tlsInputStr, hostnameArgStr string
+	var portIntArg int
+	switch args[1] {
+	case "server":
+		consoleFlag = 0
+		serverCommand.Parse(args[2:])
+		if flag = flag.Lookup(serverType); flag == nil || serverType != "http" && serverType != "https" {
+			flag.Usage()
+			err := fmt.Errorf("Invalid ServerType flag -s <server type> passed by user")
+			return err
+		} else {
+			serverTypeArg = flag.Value.(flag.Getter).Get().(string)
+		}
+		if flag = flag.Lookup(netInterface); flag == nil || netInterface == "" {
+			flag.Usage()
+			err := fmt.Errorf("Missing Network Interface -e <network interface>")
+			return err
+		} else {
+			netInterfaceName = flag.Value.(flag.Getter).Get().(string)
+			ifconfig, err := net.InterfaceByName(netInterfaceArg)
+			util.CheckError(err)
+			ifconfigCIDRTmp, err := util.ConvIfconfigNameToCIDR(ifconfig, netInterfaceName)
+			util.CheckError(err)
+			netInterfaceCDIR = ifconfigCIDRTmp
+		}
+		if flag = flag.Lookup(portInt); flag == nil {
+			flag.Usage()
+			err := fmt.Errorf("Invalid TCP port number -p <port number>")
+			return err
+		} else {
+			portIntArg = flag.Value.(flag.Getter).Get().(int)
+		}
+		if flag = flag.Lookup(hostnamesStr); flag == nil || hostnamesStr == "" {
+			flag.Usage()
+			err := fmt.Errorf("Missing DNS or vhosting alias -H <alias>")
+			return err
+		} else {
+			hostnamesStrArg = flag.Value.(flag.Getter).Get().(string)
+		}
+		if flag = flag.Lookup(ipAddress); flag == nil || ipAddress == "" {
+			flag.Usage()
+			err := fmt.Errorf("Missing valid IPv4 address -i <ip address>")
+			return err
+		} else {
+			ipAddressArg = flag.Value.(flag.Getter).Get().(string)
+			if !util.CheckValidIP(ipAddressArg) {
+				flag.Usage()
+				err := fmt.Errorf("Invalid IP address provided: %s".ipAddressArg)
+				return err
+			}
+		}
+		if flag = flag.Lookup(tlsInputStr); flag != nil {
+			tlsInputStr = flag.Value.(flag.Getter).Get().(string)
+			if flag = flag.Lookup(serverType); flag == nil && flag.Value.(flag.Getter).Get.(string) != "https" {
+				flag.Usage()
+				err := fmt.Errorf("TLS information provided, but server type -s is not https")
+				return err
+			}
+			if strings.Count(tlsInputStr, ",") != correctTlsArgsCount {
+				flag.Usage()
+				err := fmt.Errorf("TLS information provided does not contain correct number of comma delimited arguments: %s", tlsInputStr)
+				return err
+			}
+			// TLS library checks can occur here!
+		} else {
+			tlsStrArg = ""
+		}
+	case "console":
+		consoleFlag = 1
+	default:
+		flag.Usage()
+		err := fmt.Errorf("Bad command given")
 		return err
 	}
- 
-        
-        ifconfigArgStr :=
-        portArgInt :=
-        hostnameStr :=
-        ipAddress := 
-        tlsArgsStr :=
-
-
-	// serverType
-	// ipAddress
-	// netinterface
-	util.CheckValidInterface(flag.Lookup(netInterface))
-	// port
-	// tlsInputStr
-	// hostnamesStr
-
 
 	util.CheckError(err)
 	mhAssignedServerIDCounter := metahandler.InitSelf()
@@ -197,14 +246,14 @@ func HandleArgs(args []string) error {
 	case 1:
 		server := Server{}
 		server.setDefaultServerConfig()
-		server.InitServerFromArgs(mhAssignedServerID, ipAddressArg, hostnameStr, ifconfigArgStr, portArg, tlsArgsStr)
+		server.InitServerFromArgs(mhAssignedServerID, serverTypeArg, ipAddressArg, hostnameArgStr, netInterfaceName, netInterfaceCDIR, portArgInt, tlsArgsStr)
 		metahandler.SelectAction(server, consoleFlag)
 	case 2:
 		fmt.Println("metahandler.ToConsole()")
 	case 0:
 		fmt.Println("Error with checkArgs")
 	default:
-		fmt.Println("no value passed")
+		err := fmt.Errorf("No consoleFlag: %d value passed", consoleFlag)
 		return err
 	}
 
