@@ -20,9 +20,26 @@
 
 
 Flow
-- Args to pass to metahandler
-- metahandler marshals data to struct and create/start/stop/config passing create args to file named per server type
+- main -> handleArgs 
+- handleArgs.go marshals data to struct (to initStruc)
+    - SetDefaultConfig() to force no nil values
+    - InitSeverFromArgs (instead from InitServerStruct)
+    - metahandler.SelectAction(s *Server runFlag) 
+- metahandler (to do the heavy lifting )
+    - SelectAction
+    - Actions...
+    - metahandler  and create/start/stop/config passing ServerType and some flag to (console would fit in here: either run create server or goto Console)
+    - NOT SURE ABOUT CONFIG
+- web ( because web is the priority)
+- http
 - either http OR tls and https
+
+Concerns:
+- Going overboard with args
+- Logging
+
+
+
 
 Todo
 1. main.go : args - make new main, compare struct in metahandler, test variables in main to create commands:
