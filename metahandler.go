@@ -13,85 +13,6 @@ import (
 	"github.com/7ru7h/Shadow/omniServer/util.go"
 )
 
-		
-type Server struct {
-        ServerType int // Integer reference for each - decimalise as in 0 - 9 is debug; 10 is webserver, 20 proxy, 30 capture - 11 is then an option for feature extension of a webserver
-        ServerID int // 0 ID is temporary ID till checks, negative digits are stopped server IDs
-        ServerWithCtx *http.Server
-        Ctx Context
-        CancelCtx CancelFunc
-        Mux *ServerMux
-        ServerInfo ServerInfo
-        TLSInfo TLSInfo
-        NewProc bool
-        ProcInfo ProcInfo
-}
-
-// For if Server is required to be run as a new process
-type ProcInfo struct {
-        PID int
-        UID int
-}
-
-type ServerInfo struct {
-        Status int
-        Hostnames []string
-        TotalHostnames int
-        ListeningPort int
-        ServerAddr string
-}
-
-type TLSInfo struct {
-        ServerCertPath string
-        ServerKeyPath string
-        CertExpiryDays int
-}
-
-// 0 ID is set for all initialing servers till checks
-func (s *Server) InitServerStruct(hasTLS, hasHosts, newProc bool, argsServerInfo, fromArgsTlsInfo []string) (error) {
-	//  
-	//
-	//
-	tls := TLSInfo{}
-	if hasTLS {
-		checkCertPath, err := util.CheckFileExists(fromArgsTlsInfo[1]) 
-		if !checkCertPath {
-			//
-			return err
-		} else {
-			tls.ServerCertPath = fromArgsTlsInfo[1]
-		}
-		checkKeyPath, err := util.CheckFileExists(fromArgsTlsInfo[2])
-		if !checkKeyPath {
-			//
-			return err
-		} else {
-			tls.ServerKeyPath = fromArgsTlsInfo[2]
-
-		}
-        	tls.CertExpiryDays = fromArgsTlsInfo[3]
-		s.TLSInfo = tls
-	} else { 
-		tls.ServerCertPath = "none"
-		tls.ServerKeyPath = "none"
-        	tls.CertExpiryDays = -1
-		s.TLSInfo = tls
-	}
-	
-	s.ServerID = 0
-
-        //EvaluateHostnames return len(arr)
-	ServerInfo {
-		Status = 0,
-                Hostnames = ,
-                TotalHostnames = len()-1
-		// hostnames =  
-		// func () if !hasHosts { hostname = "" } else { hostnameList := fromArgsServerInfo[INDEX] }
-		// 
-	}
-	
-}
-
 func (s *Server) CreateServer() (error)  {
         if CheckAvaliableIDs(s.ServerID) || CheckAvaliableIDs() {
                 // ID in use
@@ -199,24 +120,6 @@ func (s *Server) CloseServer() (error)  {
 // manager/handler
 // server 
 
+func SelectAction(s *Server) {
 
-
-
-func CheckArgs(args []string) error {
-
-}
-
-// Remember to reread oldmain.go !!
-// logging has to done somewhere
-func HandleAll(args []string) error {
-       	err := checkArgs(args)
-	util.CheckError(err)
-	server := Server{}
-	server.InitServerStruct() // WTF are these args
-	// Selection
-
-
-        // GracefulExit()
-	
-	return nil
 }

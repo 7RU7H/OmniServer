@@ -2,10 +2,10 @@ package OmniServer
 
 import (
 	"os"
-	
-	"github.com/7ru7h/OmniServer/metahandler.go"
+
+	"github.com/7ru7h/OmniServer/cli.go"
 )
 
 func main() {
-	os.Exit(metahandler.HandleAll(os.Args[1:]))
+	os.Exit(cli.HandleAll(os.Args[1:]))
 }
