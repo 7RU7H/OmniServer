@@ -1,3 +1,12 @@
+package OmniServer
+
+import (
+        "net/http"
+        "strings"
+        "context"
+        "os"
+)
+
 
 // Webserver 
 // Specifics of http or https (tls) are seperated to each
@@ -54,7 +63,7 @@
 
 
 // Upload file - filename
-func uploadFileHandler(w http.ResponseWriter, r *http.Request) error {
+func UploadFileHandler(w http.ResponseWriter, r *http.Request) error {
 
         // Parse our multipart form, 10 << 20 specifies a maximum
         // upload of 10 MB files.
@@ -82,7 +91,7 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) error {
         //log.Print("",  ) File upload request success
 
         // Create a temporary file within our temp-images directory that conforms to a naming scheme
-        tempFile, err := ioutil.TempFile(tmpUploadDir, "tmp-")
+        tempFile, err := os.TempFile(tmpUploadDir, "tmp-")
         if err != nil {
                 // Error creating temporary file
                 return err
@@ -90,7 +99,7 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) error {
         defer tempFile.Close()
 
         // read all of the contents of our uploaded file into a byte array
-        fileBytes, err := ioutil.ReadAll(file)
+        fileBytes, err := os.ReadFile(file)
         if err != nil {
                 // Failed to read file being uploaded to byte array
                 return err
@@ -105,7 +114,7 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 // Download file - filename
-func downloadFileHandler(w http.ResponseWriter, r *http.Request) error {
+func DownloadFileHandler(w http.ResponseWriter, r *http.Request) error {
 
         // client := Headers - IP User-Agent
         // requestedFileToDownload :=
@@ -125,7 +134,7 @@ func downloadFileHandler(w http.ResponseWriter, r *http.Request) error {
         return nil
 }
 
-func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) error {
+func SaveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) error {
         builder := strings.Builder()
         startTime := time.Now()
         builder.WriteString(os.TempDir() + "/" + strings.ReplaceAll(r.RemoteAddr, ".", "-") + "-T-" + strconv.Itoa(int(time.Now().Unix())))

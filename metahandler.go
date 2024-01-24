@@ -113,14 +113,7 @@ func (s *Server) CreateServer() (error)  {
 
 }
 
-func (s *Server) CreateWebServer() (error) {
-        // Define Mux first to then pass it in Context Creation
-        s.Mux = CreateDefaultWebServerMux()
-        // Context creation
-        // Assigned to a struct!
-        s.ServerWithCtx, s.Ctx, s.CancelCtx = InitServerContext(s.ServerInfo.ListeningPort, s.ServerInfo.ServerAddr, s.Mux)
-        return nil
-}
+
 
 //
 func (s *Server) StartServer() (error)  {
@@ -206,25 +199,24 @@ func (s *Server) CloseServer() (error)  {
 // manager/handler
 // server 
 
-// Mux is a multiplexer to handle routes for Webserver
-func CreateDefaultWebServerMux() *ServerMux {
-        mux := http.NewServeMux()
-        // Setup routes
-        mux.HandleFunc("/upload", uploadFileHandler())
-        mux.HandleFunc("/download", downloadFileHandler())
-        mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler())
-        return mux
+
+
+
+func CheckArgs(args []string) error {
+
 }
 
-func InitServerContext(lportString, keyServerAddr string, srvMux *ServerMux)  (*http.Server, Context, CancelFunc, error) {
-        ctx, cancelCtx := context.WithCancel(context.Background())
-        server := &http.Server{
-                Addr:    lportString,
-                Handler: srvMux,
-                BaseContext: func(l net.Listener) context.Context {
-                        ctx = context.WithValue(ctx, keyServerAddr, l.Addr().String())
-                        return ctx
-                },
-        }
-        return server, ctx, cancelCtx, nil
+// Remember to reread oldmain.go !!
+// logging has to done somewhere
+func HandleAll(args []string) error {
+       	err := checkArgs(args)
+	util.CheckError(err)
+	server := Server{}
+	server.InitServerStruct() // WTF are these args
+	// Selection
+
+
+        // GracefulExit()
+	
+	return nil
 }
