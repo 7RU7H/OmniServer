@@ -1,7 +1,9 @@
 package omniServer
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -52,4 +54,24 @@ func CheckValidIP(ip string) bool {
 		}
 	}
 	return true
+}
+
+func ConvertIfconfigNameToIPstr() (string error) {
+
+	return
+}
+
+func CheckValidInterface(interfaceName string) error {
+	if string.Contains(interfaceName, '.', 4) {
+		CheckValidInterface(interfaceName)
+		CheckError(err)
+		return nil
+	}
+	_, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		fmt.Printf("%s is not a valid network interface\n", interfaceName)
+	} else {
+		fmt.Printf("%s is a valid network interface\n", interfaceName)
+	}
+	return nil
 }
