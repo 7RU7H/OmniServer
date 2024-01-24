@@ -2,24 +2,12 @@ package omniServer
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
 	"time"
-	
-	// "github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/omniServer/cli.go
-	// "github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/omniServer/console.go
-	"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/omniServer/tls.go
-	"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/omniServer/util.go
-	"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/"github.com/7ru7h/Shadow/omniServer/metahandler.go 
+
+	"github.com/7RU7H/OmniServer/metahandler.go"
+	"github.com/7RU7H/OmniServer/util.go"
 )
-
-
-
-
 
 func main() {
 	// Testing values
@@ -27,8 +15,8 @@ func main() {
 	vhost := "testwebserver.nvm"
 	isTLS := false
 	customCert := ""
-	
-	var portRequested := 8443 // dummy CLI value
+
+	var portRequested int = 8443 // dummy CLI value
 	var listeningPort string
 	ipAddress := "127.0.0.1"
 	tlsCert := "/path/to/cert"
@@ -53,30 +41,27 @@ func main() {
 	var certExpiryDaysSeed string
 	var certExpiryDaysRangeLowerBound int
 	var certExpiryDaysRangeUpperBound int
-
 	var certExpiryDaysRand int
 
 	// Post CLI command checks
-	// tempDir := //set to linux /tmp/ or Windows\Temp 
+	// tempDir := //set to linux /tmp/ or Windows\Temp
 
-
-	// Check Server Addr 
-	// Research interfaces 
-	serverAddr := util.CheckValidIP(ipAddress) // ServerAddr required for context creation 
-
+	// Check Server Addr
+	// Research interfaces
+	serverAddr := util.CheckValidIP(ipAddress) // ServerAddr required for context creation
 	// check port in use
 	listeningPort = util.ConvPortNumber(portRequested)
 
 	// checks completion check for cli and general goodness
 	// Call CLI At Some Point
-	
+
 	metahandler.DUMMY()
 	// MetaHander IDEA  - to create, run, close servers - isTLS, vhost, interface, listeningPort, ipAddress
-	// Type of server 
+	// Type of server
 	// Create X server
-		// mux for handling requests
+	// mux for handling requests
 	// ListeningAndServer
-	// CloseServer 
+	// CloseServer
 
 	// CloseApplication
 	appTerminateTime := time.Now()
@@ -85,5 +70,3 @@ func main() {
 	fmt.Fprintf("Application started: %s - Terminated: %s - Runtime: %s", appStartTime, appTerminateTime, totalRuntime)
 	os.exit(0)
 }
-
-
