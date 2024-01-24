@@ -13,6 +13,9 @@ import (
 	"github.com/7ru7h/Shadow/omniServer/util.go"
 )
 
+// ITS AN OPTIONS PATTERN IDIOT ME THE ALGORITHM KNOWS
+// https://golang.cafe/blog/golang-functional-options-pattern.html
+
 func (s *Server) CreateServer() (error)  {
         if CheckAvaliableIDs(s.ServerID) || CheckAvaliableIDs() {
                 // ID in use
