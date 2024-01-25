@@ -1,4 +1,4 @@
-package omniServer
+package OmniServer
 
 import (
         "fmt"
@@ -9,8 +9,7 @@ import (
         "strings"
         "time"
 
-        "github.com/7ru7h/Shadow/omniServer/tls.go"
-	"github.com/7ru7h/Shadow/omniServer/util.go"
+	"github.com/7ru7h/OmniServer/util"
 )
 
 // ITS AN OPTIONS PATTERN IDIOT ME THE ALGORITHM KNOWS

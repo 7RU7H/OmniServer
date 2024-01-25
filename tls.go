@@ -1,4 +1,4 @@
-package omniServer
+package OmniServer
 
 import (
 	"errors"

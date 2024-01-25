@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
-	"OmniServer/util.go"
 )
 
 type Server struct {

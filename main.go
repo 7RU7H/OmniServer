@@ -2,8 +2,6 @@ package OmniServer
 
 import (
 	"os"
-
-	"github.com/7ru7h/OmniServer/cli.go"
 )
 
 func main() {
