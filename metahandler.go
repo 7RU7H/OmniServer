@@ -32,8 +32,20 @@ func (m *MetaControl) AddServer(s *Server) error {
         return nil
 }
 
+func (m *MetaControl) CheckServerExists() error {
+        i,err := m.FindServerID(s.ServerID, s.ServerStatus)
+        CheckError(err)
+        if i != -1 {
+                CheckError(err)
+                return err
+        }
+        m.FindPID()
+        // Compare Server at &i and s
+        //m.allServerPtr[i]
+}
+
 func (m *MetaControl) DeleteServer(s *Server) error {
-        m.CheckRunningPID(s.ProcInfo.PID)
+        m.FindPID(s.ProcInfo.PID)
 
         i,err := m.FindServerID(s.ServerID, s.ServerStatus)
         if i == -1 {
@@ -42,6 +54,7 @@ func (m *MetaControl) DeleteServer(s *Server) error {
         }
         delete(m.ServerID[i])
         s.ServerID = 0
+        return nil
 }
 
 func (m *MetaControl) FindServerID(id int) (int, error) {
@@ -60,14 +73,15 @@ func (m *MetaControl) FindServerID(id int) (int, error) {
 
 // Check is bad:
 // Find & New & Delete
-func (m *MetaControl) CheckRunningPID(pid int) error {
+func (m *MetaControl) FindPID(pid int) error {
         // ps aux && handle grep
         // 
 }
 
  
 // AddConsole
-// DelistConsole
+// CheckConsoleExists
+// DeleteConsole
 //  
 // Console Update 
 //
@@ -110,19 +124,15 @@ func StartServer(s *Server) (error)  {
 
 
 
-*
-
 // Pause server, retain memory and does not deallocate
 func PauseServer() (error)  {
-        if !CheckAvaliableIDs(s.ServerID) {
-                // Error no server ID to
-        }
+        err := m.CheckServerExists(s) 
+        CheckError(err)
 }
 
-func StopServer(s *Server) (error)  {
-        if !CheckAvaliableIDs(s.ServerID) {
-                // Error no server ID to
-        }
+func (m *MetaControl) StopServer(s *Server) (error)  {
+        err := m.CheckServerExists(s) 
+        CheckError(err)
 
         // Context termination
         s.CancelCtx()
@@ -130,24 +140,19 @@ func StopServer(s *Server) (error)  {
         ServerTerminationTime := time.Now()
         // Checks on termination
 
-        return ServerTerminationTime, time.Now()
+        return ServerTerminationTime, time.Now(), nil
 }
 
 
 // What does restart mean and why? - Recreate Context and reassign memory etc
 func RestartServer(s *Server) (error)  {
-        if !CheckAvaliableIDs(s.ServerID) {
-                // Error no server ID to
-                return err
-        }
+        
         return nil
 }
 
 
-func CreateServer(s *Server) (error)  {
-        if CheckAvaliableIDs(s.ServerID) || CheckAvaliableIDs() {
-                // ID in use
-        }
+func (m *MetaControl) CreateServer(s *Server) (error)  {
+        m.AddServer()
         // ServerType == Integer reference for each - decimalise as in 0 - 9 is debug; 10 is webserver, 20 proxy, 30 capture - 11 is then an option for feature extension of a webserver
         switch s.ServerType {
                 case 10: // HTTP Server
@@ -173,6 +178,7 @@ func GracefulExit() error {
 
 
 func SelectAction(s *Server, actionFlag int) error {
+        // is metacontrol the best name?
         switch actionFlag {
         case 1:
                 // StartConsole
