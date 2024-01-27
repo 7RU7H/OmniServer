@@ -175,12 +175,40 @@ func (m *MetaControl) CreateServer(s *Server) error {
 	return nil
 }
 
+// Qs
+// - How do build enough of the need bridges to console and IPC without rabbitholing?
+// -
+//
+// As
+//	- IPC needs a seperate module
+//	- metahandler should not handle go routines; the catergory of server should
+//  -
+//
+
+//
+// Plugin package does not support Windows and not likely given the last 6 years; so whole binary spawnage is just how it is
+//
+// Either it is a Console and need IPC
+// Or is not and does not
+// Is a spawned process, which would have to be from the server
+//
+// If server from cli does not need metahandler
+// or spawned process - need a child process metahandler to recieve IPC channel message to its go routines
+//
+// consoleFlag && ProcFlag
+// 0 : 0 for server from cli
+// 1 : PID where PPID is the same and PID
+// 0 : PID where PPID is not the same as PID
+//
+
+// Pipes for IPC for use chan across procs
+//
 // GO ROUTINES internal threading
 // Channels for go routine communication
-// Pipes for IPC
 
 // Infinite Loop prevention
-// PPID && cli argument -spawn?
+// ProcInfo.PPID && PID
+// PID and PPID exchange && FEATURE CREEPAGE.
 
 // TODO
 func stopRoutine(cancel context.CancelFunc) error {
