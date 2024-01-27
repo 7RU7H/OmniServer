@@ -47,7 +47,7 @@ func (m *MetaControl) DeleteServer(s *Server) error {
 	m.FindPID(s.ProcInfo.PID)
 
 	i, err := m.FindServerID(s.ServerID, s.ServerStatus)
-	if i == -1 {
+	if i == -9999 {
 		CheckError(err)
 		return err
 	}
@@ -63,7 +63,7 @@ func (m *MetaControl) FindServerID(id int) (int, error) {
 		}
 	}
 	err := fmt.Errorf("Server ID: %d not found", id)
-	return -1, err
+	return -9999, err
 }
 
 // Check is bad:
@@ -85,11 +85,14 @@ func (m *MetaControl) FindPID(pid int) error {
 // func StopConsole() error {}
 //
 
-func StartServer(s *Server) error {
-	if !CheckAvaliableIDs(s.ServerID) {
+func (m *MetaControl) StartServer(s *Server) error {
+	i, err := m.FindServerID(s.ServerID)
+	if i == -9999 {
 		err := fmt.Errorf("No ServerID found for %d", s.ServerID)
 		return err
 	}
+	// update ServerStatus to pending
+	//
 
 	if !s.NewProc {
 
@@ -101,15 +104,15 @@ func StartServer(s *Server) error {
 	}
 
 	if errors.Is(err, http.ErrServerClosed) {
-		fmt.Printf("%s closed\n", ServerID, err)
-		log.Fatal("%s closed\n", ServerID, err)
+		fmt.Printf("%s closed\n", s.ServerID, err)
+		log.Fatal("%s closed\n", s.ServerID, err)
 		return err
 	} else if err != nil {
-		fmt.Printf("Error listening for %s: %s\n", ServerID, err)
-		log.Fatal("Error listening for %s - ID %d: %s\n", ServerID, err)
+		fmt.Printf("Error listening for %s: %s\n", s.ServerID, err)
+		log.Fatal("Error listening for %s - ID %d: %s\n", s.ServerID, err)
 		return err
 	} else {
-		log.Printf("%s is listening...\n", ServerID)
+		log.Printf("%s is listening...\n", s.ServerID)
 		return err
 	}
 }
