@@ -1,6 +1,7 @@
 package OmniServer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -91,8 +92,6 @@ func (m *MetaControl) StartServer(s *Server) error {
 		err := fmt.Errorf("No ServerID found for %d", s.ServerID)
 		return err
 	}
-	// update ServerStatus to pending
-	//
 
 	if !s.NewProc {
 
@@ -146,7 +145,12 @@ func (m *MetaControl) StopServer(s *Server) (time.Time, time.Time, error) {
 }
 
 // What does restart mean and why? - Recreate Context and reassign memory etc
-func RestartServer(s *Server) error {
+func (m *MetaControl) RestartServer(s *Server, newArgs []string) error {
+	m.StopServer(s)
+	newServer := cli.Server{}
+	cli.InitServerFromArgs(newArgs)
+	m.CreateServer(newServer)
+	m.StartServer(newServer)
 
 	return nil
 }
@@ -171,6 +175,38 @@ func (m *MetaControl) CreateServer(s *Server) error {
 	return nil
 }
 
+// GO ROUTINES
+
+// TODO
+func stopRoutine(cancel context.CancelFunc) error {
+	cancel()
+	// Perform some check that the context of the go routine has been cancelled
+	return nil
+}
+
+// This is weird code - need to learn how channels work:
+// Itutitively it should seem like true, false or false, true choice and then action of pausing or resuming then any other boolean combination is a error
+func pauseRoutine(pause, resume chan bool) error {
+	go func() {
+		for {
+
+			select {
+			case <-pause:
+				pause <- true
+				return nil
+			case <-resume:
+				resume <- true
+				return nil
+			default:
+				err := fmt.Errorf("A failure has occurred go routine channel requested pause:%b and resume %b", pause, resume)
+				return err
+			}
+		}
+	}()
+	return nil
+}
+
+// Action Select and ExitBinary
 func GracefulExit() error {
 	// For all Server, Console IDs kill each PID
 	return nil
