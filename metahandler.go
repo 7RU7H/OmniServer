@@ -175,7 +175,12 @@ func (m *MetaControl) CreateServer(s *Server) error {
 	return nil
 }
 
-// GO ROUTINES
+// GO ROUTINES internal threading
+// Channels for go routine communication
+// Pipes for IPC
+
+// Infinite Loop prevention
+// PPID && cli argument -spawn?
 
 // TODO
 func stopRoutine(cancel context.CancelFunc) error {
