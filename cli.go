@@ -45,24 +45,19 @@ type TLSInfo struct {
 }
 
 func (s *Server) setDefaultServerConfig() error {
-	s.ServerType, s.ServerID = 0
+	s.ServerType, s.ServerID, s.ServerInfo.Status = 0, 0, 0
 	s.NewProc = false
-	s.ProcInfo.PID = -1
 	s.ProcInfo.UID = os.Geteuid()
-	s.ServerInfo.Status = 0
 	s.ServerInfo.Hostnames = make([]string, 0, 0)
-	s.ServerInfo.TotalHostnames = -1
+	s.ServerInfo.TotalHostnames, s.ProcInfo.PID, s.TLSInfo.CertExpiryDays = -1, -1, -1
 	s.ServerInfo.ListeningPort = "-1"
-	s.ServerInfo.ServerAddr = ""
-	s.TLSInfo.ServerCertPath = ""
-	s.TLSInfo.ServerKeyPath = ""
-	s.TLSInfo.CertExpiryDays = -1
+	s.TLSInfo.ServerCertPath, s.ServerInfo.ServerAddr, s.TLSInfo.ServerKeyPath = "", "", ""
 	return nil
 }
 
 func (s *Server) InitServerFromArgs(mhAssignedServerID int, serverTypeArg ipAddressArg, hostnameArgStr, ifconfigName, ifconfigCIDR, portArg, tlsArgsStr string) (err error) {
 	s.ServerID = mhAssignedServerID
-	s.convServerTypeItoa()
+	s.convServerTypeItoa(serverTypeArg)
 	s.ServerInfo.Status = 1 // Initial phase checks
 	s.ServerInfo.ServerAddr = util.CheckValidIP(ipAddressArg)
 	s.ServerInfo.ListeningPort = util.ConvertPortNumber(portArg) // Needs ":" prepended to the digits
@@ -70,10 +65,11 @@ func (s *Server) InitServerFromArgs(mhAssignedServerID int, serverTypeArg ipAddr
 	s.ServerInfo.Hostnames = append(hostnameSlice)
 	s.ServerInfo.TotalHostnames = len(hostnameSlice) - 1
 	s.ServerInfo.ifconfigName = ifconfigName
-
-	ifconfigCIDR = ifconfigCIDRArg
+	s.ServerInfo.ifconfigCIDR = ifconfigCIDR
 
 	if tlsArgsStr != "" {
+		err := s.InitTLSFromArgs(tlsArgsStr)
+		util.CheckError(err)
 		// if len(tlsArgsStr) != 0 {}
 		// tlsArgs := string.SplitN(tlsArgStr, ",", -1)
 		// if (isTLS == true && len(tlsArgs) != 3) { } // chill out for a second
@@ -82,26 +78,32 @@ func (s *Server) InitServerFromArgs(mhAssignedServerID int, serverTypeArg ipAddr
 
 }
 
-func (s *Server) InitTLSFromArgs() {
-	// TLS must be converted to slice
+func (s *Server) InitTLSFromArgs(tlsArgStr string) error {
+	fromArgsTlsInfo := strings.Split(tlsArgStr, ",")
+	if len(fromArgsTlsInfo) != 3 {
+		err := fmt.Errorf("Size of fromArgsTlsInfo - sliced from tlsArgStr: %s, contains %d, of the required 3 arguments", tlsArgStr, len(fromArgsTlsInfo)-1)
+	}
 	tls := TLSInfo{}
-	checkCertPath, err := util.CheckFileExists(fromArgsTlsInfo[1])
+	checkCertPath, err := util.CheckFileExists(fromArgsTlsInfo[0])
 	if !checkCertPath {
 		//
 		return err
 	} else {
-		tls.ServerCertPath = fromArgsTlsInfo[1]
+		tls.ServerCertPath = fromArgsTlsInfo[0]
 	}
-	checkKeyPath, err := util.CheckFileExists(fromArgsTlsInfo[2])
+	checkKeyPath, err := util.CheckFileExists(fromArgsTlsInfo[1])
 	if !checkKeyPath {
 		//
 		return err
 	} else {
-		tls.ServerKeyPath = fromArgsTlsInfo[2]
+		tls.ServerKeyPath = fromArgsTlsInfo[1]
 
 	}
-	tls.CertExpiryDays = fromArgsTlsInfo[3]
+	// Default days
+	// strconv.AtoI
+	tls.CertExpiryDays = fromArgsTlsInfo[2]
 	s.TLSInfo = tls
+	return nil
 }
 
 func (s *Server) convServerTypeItoa(userArg string) error {
@@ -239,13 +241,18 @@ func HandleArgs(args []string) error {
 	}
 
 	util.CheckError(err)
-	mhAssignedServerIDCounter := metahandler.InitSelf()
+	mc := MetaControl{
+		allPIDs:       make([]int, 0, 0),
+		allServerPtr:  make([]*Server, 0),
+		allServerIDs:  make([]int, 0, 0),
+		serverCounter: 0,
+	}
 	switch consoleFlag {
 	case 1:
 		server := Server{}
 		server.setDefaultServerConfig()
-		server.InitServerFromArgs(mhAssignedServerID, serverTypeArg, ipAddressArg, hostnameArgStr, netInterfaceName, netInterfaceCDIR, portArgInt, tlsArgsStr)
-		metahandler.SelectAction(server, consoleFlag)
+		server.InitServerFromArgs(mc.serverCounter, serverTypeArg, ipAddressArg, hostnameArgStr, netInterfaceName, netInterfaceCDIR, portIntArg, tlsInputStr)
+		mc.SelectAction(server, consoleFlag)
 	case 2:
 		fmt.Println("metahandler.ToConsole()")
 	case 0:
