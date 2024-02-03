@@ -1,9 +1,5 @@
 package OmniServer
 
-import (
-	"os"
-)
+// +build !nolog
 
-func main() {
-	os.Exit(cli.HandleAll(os.Args[1:]))
-}
+// CLI -> if http else https -> Done - just simple done project
