@@ -33,48 +33,71 @@ import (
 // Validates and sorts Args to serverType, interfaceName, interfaceCIDR(retrived by this application), IP, Port, TLS
 func handleArgs(args []string) ([]string, error) {
 	regexSafeArgs := "#" + strings.Join(args, "#") + "#"
-	httpRegex := `#http#`
-	httpsRegex := `#https#`
-	interfaceRegex := ``
-	ipRegex := `#\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}#`
-	portRegex := `#\d{1,5}#`
-	tlsRegex := ``
-
+	httpRegex := regexp.MustCompile(`#http#`)
+	httpsRegex := regexp.MustCompile(`#https#`)
+	interfaceRegex := regexp.MustCompile(`##`)
+	ipRegex := regexp.MustCompile(`#\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}#`)
+	portRegex := regexp.MustCompile(`#\d{1,5}#`)
+	tlsRegex := regexp.MustCompile(`##`)
+	sortedArgs := make([]string, len(args)+1)
 	if len(args) != 6 {
-		matchHTTP, err := regexp.MatchString(httpRegex, regexSafeArgs)
+		matchHTTP, err := regexp.MatchString(httpRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchInterface, err := regexp.MatchString(interfaceRegex, regexSafeArgs)
+		matchInterface, err := regexp.MatchString(interfaceRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchIP, err := regexp.MatchString(ipRegex, regexSafeArgs)
+		matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchPort, err := regexp.MatchString(portRegex, regexSafeArgs)
+		matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
 		checkError(err)
 		httpAllMatched := matchHTTP && matchInterface && matchIP && matchPort
 		if !httpAllMatched {
-
+			err := fmt.Errorf("Arguments provided are %v: %v", httpAllMatched, args)
+			return nil, err
 		}
-		// Get interfaceCIDR
+		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		sortedArgs[1] = strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		//sortedArgs[2] = convIfconfigNameToCIDR() // needs inferface from sortedArgs[1]
+		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+
+		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
+			err := fmt.Errorf("Invalid IP and Port combination: %s and %s", sortedArgs[3], sortedArgs[4])
+			return nil, err
+		}
+		checkError(err)
+		return sortedArgs, nil
 
 	} else {
-		matchHTTPS, err := regexp.MatchString(httpsRegex, regexSafeArgs)
+		matchHTTPS, err := regexp.MatchString(httpsRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchInterface, err := regexp.MatchString(interfaceRegex, regexSafeArgs)
+		matchInterface, err := regexp.MatchString(interfaceRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchIP, err := regexp.MatchString(ipRegex, regexSafeArgs)
+		matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchPort, err := regexp.MatchString(portRegex, regexSafeArgs)
+		matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchTLS, err := regexp.MatchString(tlsRegex, regexSafeArgs)
+		matchTLS, err := regexp.MatchString(tlsRegex.String(), regexSafeArgs)
 		checkError(err)
 		httpsAllMatched := matchHTTPS && matchInterface && matchIP && matchPort && matchTLS
 		if !httpsAllMatched {
-
+			err := fmt.Errorf("Arguments provided are %v: %v", httpsAllMatched, args)
+			return nil, err
 		}
 		// Get interfaceCIDR
 		// Validate TLS
+		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		sortedArgs[1] = strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		//sortedArgs[2] = convIfconfigNameToCIDR() // needs inferface from sortedArgs[1]
+		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		// sortedArgs[5] = TLS
+		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
+			err := fmt.Errorf("Invalid IP and Port combination: %s and %s", sortedArgs[3], sortedArgs[4])
+			return nil, err
+		}
+		checkError(err)
+		return sortedArgs, nil
 	}
-
-	return sortedArgs, nil
 }
 
 func main() {
@@ -106,10 +129,9 @@ func main() {
 
 }
 
-func convPortNumber(portNumber int) string {
+func prependColonToPortNumber(port string) string {
 	builder := strings.Builder{}
-	portStr := strconv.Itoa(portNumber)
-	builder.WriteString(":" + portStr)
+	builder.WriteString(":" + port)
 	listeningPort := builder.String()
 	builder.Reset()
 	return listeningPort
@@ -133,6 +155,15 @@ func checkFileExists(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func checkValidPort(portStr string) bool {
+	portInt, err := strconv.Atoi(strings.ReplaceAll(portStr, ":", ""))
+	checkError(err)
+	if portInt <= 65535 && portInt > -1 {
+		return true
+	}
+	return false
 }
 
 func checkValidIP(ip string) bool {
