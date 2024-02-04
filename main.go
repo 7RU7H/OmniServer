@@ -54,9 +54,18 @@ func handleArgs(args []string) ([]string, error) {
 			err := fmt.Errorf("Arguments provided are %v: %v", httpAllMatched, args)
 			return nil, err
 		}
+
+                checkError(err)
+
+
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		sortedArgs[1] = strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		//sortedArgs[2] = convIfconfigNameToCIDR() // needs inferface from sortedArgs[1]
+		ifconfigRegexedFromArgs := strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		_, err := net.InterfaceByName(ifconfigRegexedFromArgs)
+		checkError(err)
+		sortedArgs[1] = ifconfigRegexedFromArgs	
+                ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig, ifconfigRegexedFromArgs)
+		checkError(err)
+		sortedArgs[2] = ifconfigCIDRTmp // needs inferface from sortedArgs[1]
 		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 
@@ -86,9 +95,13 @@ func handleArgs(args []string) ([]string, error) {
 		// Get interfaceCIDR
 		// Validate TLS
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		sortedArgs[1] = strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		//sortedArgs[2] = convIfconfigNameToCIDR() // needs inferface from sortedArgs[1]
-		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		ifconfigRegexedFromArgs := strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		_, err := net.InterfaceByName(ifconfigRegexedFromArgs)
+		checkError(err)
+		sortedArgs[1] = ifconfigRegexedFromArgs	
+                ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig, ifconfigRegexedFromArgs)
+		checkError(err)
+		sortedArgs[2] = ifconfigCIDRTmp // needs inferface from sortedArgs[1]		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		// sortedArgs[5] = TLS
 		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
