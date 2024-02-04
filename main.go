@@ -28,44 +28,43 @@ import (
 // TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
 // HTTPS server
 // TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
-// Add all the profession
+// Add all the profession stuff
+// - DONOT WORRY ABOUT nested regex -> string sorted args oneliners no (5||6)*2 additional variable declarations making that underreadable dense vertically and save some memory
 
 // Validates and sorts Args to serverType, interfaceName, interfaceCIDR(retrived by this application), IP, Port, TLS
 func handleArgs(args []string) ([]string, error) {
 	regexSafeArgs := "#" + strings.Join(args, "#") + "#"
 	httpRegex := regexp.MustCompile(`#http#`)
 	httpsRegex := regexp.MustCompile(`#https#`)
-	interfaceRegex := regexp.MustCompile(`##`)
 	ipRegex := regexp.MustCompile(`#\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}#`)
 	portRegex := regexp.MustCompile(`#\d{1,5}#`)
 	tlsRegex := regexp.MustCompile(`##`)
 	sortedArgs := make([]string, len(args)+1)
+
+	matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
+	checkError(err)
+	matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
+	checkError(err)
+
 	if len(args) != 6 {
 		matchHTTP, err := regexp.MatchString(httpRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchInterface, err := regexp.MatchString(interfaceRegex.String(), regexSafeArgs)
+		tmpReduced := httpRegex.ReplaceAllString(regexSafeArgs, "")
+		tmpReduced = ipRegex.ReplaceAllString(tmpReduced, "")
+		tmpReduced = portRegex.ReplaceAllString(tmpReduced, "")
+		ifconfigPotentialName := strings.ReplaceAll(tmpReduced, "#", "")
+		ifconfig, err := net.InterfaceByName(ifconfigPotentialName)
 		checkError(err)
-		matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
+		ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig)
 		checkError(err)
-		matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
-		checkError(err)
-		httpAllMatched := matchHTTP && matchInterface && matchIP && matchPort
+		httpAllMatched := matchHTTP && matchIP && matchPort
 		if !httpAllMatched {
 			err := fmt.Errorf("Arguments provided are %v: %v", httpAllMatched, args)
 			return nil, err
 		}
-
-                checkError(err)
-
-
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		ifconfigRegexedFromArgs := strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		_, err := net.InterfaceByName(ifconfigRegexedFromArgs)
-		checkError(err)
-		sortedArgs[1] = ifconfigRegexedFromArgs	
-                ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig, ifconfigRegexedFromArgs)
-		checkError(err)
-		sortedArgs[2] = ifconfigCIDRTmp // needs inferface from sortedArgs[1]
+		sortedArgs[1] = ifconfigPotentialName
+		sortedArgs[2] = ifconfigCIDRTmp
 		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 
@@ -79,29 +78,26 @@ func handleArgs(args []string) ([]string, error) {
 	} else {
 		matchHTTPS, err := regexp.MatchString(httpsRegex.String(), regexSafeArgs)
 		checkError(err)
-		matchInterface, err := regexp.MatchString(interfaceRegex.String(), regexSafeArgs)
+		tmpReduced := httpRegex.ReplaceAllString(regexSafeArgs, "")
+		tmpReduced = ipRegex.ReplaceAllString(tmpReduced, "")
+		tmpReduced = portRegex.ReplaceAllString(tmpReduced, "")
+		tmpReduced = tlsRegex.ReplaceAllString(tmpReduced, "")
+		ifconfigPotentialName := strings.ReplaceAll(tmpReduced, "#", "")
+		ifconfig, err := net.InterfaceByName(ifconfigPotentialName)
 		checkError(err)
-		matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
-		checkError(err)
-		matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
+		ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig)
 		checkError(err)
 		matchTLS, err := regexp.MatchString(tlsRegex.String(), regexSafeArgs)
 		checkError(err)
-		httpsAllMatched := matchHTTPS && matchInterface && matchIP && matchPort && matchTLS
+		httpsAllMatched := matchHTTPS && matchIP && matchPort && matchTLS
 		if !httpsAllMatched {
 			err := fmt.Errorf("Arguments provided are %v: %v", httpsAllMatched, args)
 			return nil, err
 		}
-		// Get interfaceCIDR
-		// Validate TLS
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		ifconfigRegexedFromArgs := strings.ReplaceAll(strings.Join(interfaceRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		_, err := net.InterfaceByName(ifconfigRegexedFromArgs)
-		checkError(err)
-		sortedArgs[1] = ifconfigRegexedFromArgs	
-                ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig, ifconfigRegexedFromArgs)
-		checkError(err)
-		sortedArgs[2] = ifconfigCIDRTmp // needs inferface from sortedArgs[1]		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
+		sortedArgs[1] = ifconfigPotentialName
+		sortedArgs[2] = ifconfigCIDRTmp
+		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		// sortedArgs[5] = TLS
 		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
@@ -137,6 +133,7 @@ func main() {
 	switch sortedArgs[0] {
 	case "http":
 	case "https":
+		// Validate TLS
 	default:
 	}
 
