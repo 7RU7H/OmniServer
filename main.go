@@ -1,4 +1,4 @@
-package OmniServer
+package main
 
 import (
 	"flag"
@@ -29,6 +29,100 @@ import (
 // TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
 // Add all the profession stuff
 // - DONOT WORRY ABOUT nested regex -> string sorted args oneliners no (5||6)*2 additional variable declarations making that underreadable dense vertically and save some memory
+
+func buildHTTPServer(args []string) error {
+	fmt.Println("building HTTP")
+	return nil
+}
+func runHTTPServer() error {
+	fmt.Println("running HTTP")
+	return nil
+}
+func validateTLS(args string) (string, error) {
+	fmt.Println("validating TLS")
+	return "TLS incoming", nil
+}
+
+func buildHTTPSServer(nontlsArgs []string, tls string) error {
+	fmt.Println("building HTTPS")
+	return nil
+}
+func runHTTPSServer() error {
+	fmt.Println("running HTTPS")
+	return nil
+}
+
+func gracefulExit() error {
+	fmt.Println("SIG THIS or something fanciy please!")
+	return nil
+}
+
+func prependColonToPortNumber(port string) string {
+	builder := strings.Builder{}
+	builder.WriteString(":" + port)
+	listeningPort := builder.String()
+	builder.Reset()
+	return listeningPort
+}
+
+// Everything is fatal till EVERYTHING WORKS relax those switch statement fingers custom error switch
+// Use regex `(err, \d)` to find and change incrementally later - the error code make life easier after all ALWAYS err.New or err.Errorf
+func checkError(err error, errorCode int) {
+	if err != nil {
+		log.Fatal(err, " - Error code: ", errorCode)
+	}
+}
+
+func checkFileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err != nil {
+		log.Fatal(err)
+		return false, err
+	}
+	if os.IsNotExist(err) {
+		log.Fatal("File path does not exist")
+		return false, err
+	}
+	return true, nil
+}
+
+func checkValidPort(portStr string) bool {
+	portInt, err := strconv.Atoi(strings.ReplaceAll(portStr, ":", ""))
+	checkError(err, 0)
+	if portInt <= 65535 && portInt > -1 {
+		return true
+	}
+	return false
+}
+
+func checkValidIP(ip string) bool {
+	if ip == "" {
+		return false
+	}
+	checkIP := strings.Split(ip, ".")
+	if len(checkIP) != 4 {
+		return false
+	}
+	for _, ip := range checkIP {
+		if octet, err := strconv.Atoi(ip); err != nil {
+			return false
+		} else if octet < 0 || octet > 255 {
+			return false
+		}
+	}
+	return true
+}
+
+func convIfconfigNameToCIDR(ifconfig *net.Interface) (string, error) {
+	addrs, err := ifconfig.Addrs()
+	checkError(err, 0)
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok {
+			return ipNet.String(), nil
+		}
+	}
+	return "", fmt.Errorf("No suitable IP address found")
+}
 
 // Validates and sorts Args to serverType, interfaceName, interfaceCIDR(retrived by this application), IP, Port, TLS
 func handleArgs(args []string) ([]string, error) {
@@ -109,11 +203,12 @@ func handleArgs(args []string) ([]string, error) {
 }
 
 func main() {
-	var ipAddress, netInterface, serverType, tlsInputStr string
+	var ipAddress, serverType, tlsInputStr string
+	//var netInterface string
 	var portInt int
 	flag.StringVar(&tlsInputStr, "t", "None", "Provide TLS information delimited by a comma - requires server type: -s https")
 	flag.StringVar(&serverType, "s", "http", "Provide a server of type: http, https")
-	flag.StringVar(&netInterface, "e", "localhost", "Provide a Network Interface - required!")
+	//flag.StringVar(&netInterface, "e", "lo:", "Provide a Network Interface - required!")
 	flag.StringVar(&ipAddress, "i", "127.0.0.1", "Provide a valid IPv4 address - required!")
 	flag.IntVar(&portInt, "p", 8443, "Provide a TCP port number - required!")
 	flag.Parse()
@@ -155,98 +250,4 @@ func main() {
 		checkError(err, 0)
 	}
 	return
-}
-
-func buildHTTPServer(args []string) error {
-	fmt.Println("building HTTP")
-	return nil
-}
-func runHTTPServer() error {
-	fmt.Println("running HTTP")
-	return nil
-}
-func validateTLS(args string) (string, error) {
-	fmt.Println("validating TLS")
-	return "TLS incoming", nil
-}
-
-func buildHTTPSServer(nontlsArgs []string, tls string) error {
-	fmt.Println("building HTTPS")
-	return nil
-}
-func runHTTPSServer() error {
-	fmt.Println("running HTTPS")
-	return nil
-}
-
-func gracefulExit() error {
-	fmt.Println("SIG THIS or something fanciy please!")
-	return nil
-}
-
-func prependColonToPortNumber(port string) string {
-	builder := strings.Builder{}
-	builder.WriteString(":" + port)
-	listeningPort := builder.String()
-	builder.Reset()
-	return listeningPort
-}
-
-// Everything is fatal till EVERYTHING WORKS relax those switch statement fingers custom error switch
-// Use regex `(err, \d)` to find and change incrementally later - the error code make life easier after all ALWAYS err.New or err.Errorf
-func checkError(err error, errorCode int) {
-	if err != nil {
-		log.Fatal(err, "Error code: %d", errorCode)
-	}
-}
-
-func checkFileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err != nil {
-		log.Fatal(err)
-		return false, err
-	}
-	if os.IsNotExist(err) {
-		log.Fatal("File path does not exist")
-		return false, err
-	}
-	return true, nil
-}
-
-func checkValidPort(portStr string) bool {
-	portInt, err := strconv.Atoi(strings.ReplaceAll(portStr, ":", ""))
-	checkError(err, 0)
-	if portInt <= 65535 && portInt > -1 {
-		return true
-	}
-	return false
-}
-
-func checkValidIP(ip string) bool {
-	if ip == "" {
-		return false
-	}
-	checkIP := strings.Split(ip, ".")
-	if len(checkIP) != 4 {
-		return false
-	}
-	for _, ip := range checkIP {
-		if octet, err := strconv.Atoi(ip); err != nil {
-			return false
-		} else if octet < 0 || octet > 255 {
-			return false
-		}
-	}
-	return true
-}
-
-func convIfconfigNameToCIDR(ifconfig *net.Interface) (string, error) {
-	addrs, err := ifconfig.Addrs()
-	checkError(err, 0)
-	for _, addr := range addrs {
-		if ipNet, ok := addr.(*net.IPNet); ok {
-			return ipNet.String(), nil
-		}
-	}
-	return "", fmt.Errorf("No suitable IP address found")
 }
