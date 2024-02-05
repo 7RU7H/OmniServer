@@ -124,29 +124,55 @@ func convIfconfigNameToCIDR(ifconfig *net.Interface) (string, error) {
 	return "", fmt.Errorf("No suitable IP address found")
 }
 
+func removeFlagsAndBinFromArgs(hashDelimitedArgs string) string {
+	binRegex := regexp.MustCompile(`#.[\/]OmniServer#`)
+	flagsRegex := regexp.MustCompile(`-\w{1}#`)
+	rmBinRegexStr := binRegex.ReplaceAllString(hashDelimitedArgs, "")
+	result := flagsRegex.ReplaceAllString(rmBinRegexStr, "")
+	return result
+}
+
 // Validates and sorts Args to serverType, interfaceName, interfaceCIDR(retrived by this application), IP, Port, TLS
 func handleArgs(args []string) ([]string, error) {
-	regexSafeArgs := "#" + strings.Join(args, "#") + "#"
-	httpRegex := regexp.MustCompile(`#http#`)
-	httpsRegex := regexp.MustCompile(`#https#`)
-	ipRegex := regexp.MustCompile(`#\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}#`)
-	portRegex := regexp.MustCompile(`#\d{1,5}#`)
-	tlsRegex := regexp.MustCompile(`##`)
-	sortedArgs := make([]string, len(args)+1)
+	hashDelimitedArgs := "#" + strings.Join(args, "#") + "#"
+	regexSafeArgs := "#" + removeFlagsAndBinFromArgs(hashDelimitedArgs)
 
+	fmt.Println("The result of remove binary name and flags :", regexSafeArgs)
+
+	httpRegex := regexp.MustCompile(`http#`)
+	httpsRegex := regexp.MustCompile(`https#`)
+	ipRegex := regexp.MustCompile(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}#`)
+	portRegex := regexp.MustCompile(`\d{1,5}#`)
+	tlsRegex := regexp.MustCompile(`#`)
+	sortedArgs := make([]string, len(args))
+
+	matchInterface := false
 	matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
 	checkError(err, 0)
 	matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
 	checkError(err, 0)
 
-	if len(args) != 6 {
+	if len(args) != 11 {
 		matchHTTP, err := regexp.MatchString(httpRegex.String(), regexSafeArgs)
 		checkError(err, 0)
+		interfaces, err := net.Interfaces()
+		checkError(err, 0)
+
 		tmpReduced := httpRegex.ReplaceAllString(regexSafeArgs, "")
 		tmpReduced = ipRegex.ReplaceAllString(tmpReduced, "")
 		tmpReduced = portRegex.ReplaceAllString(tmpReduced, "")
-		ifconfigPotentialName := strings.ReplaceAll(tmpReduced, "#", "")
-		ifconfig, err := net.InterfaceByName(ifconfigPotentialName)
+		interfaceArg := strings.ReplaceAll(tmpReduced, "#", "")
+		fmt.Println(interfaceArg)
+		for _, i := range interfaces {
+			if i.Name == interfaceArg {
+				matchInterface = true
+			}
+		}
+		if matchInterface != true {
+			err := fmt.Errorf("There is no interface named: %s", interfaceArg)
+			checkError(err, 0)
+		}
+		ifconfig, err := net.InterfaceByName(interfaceArg)
 		checkError(err, 0)
 		ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig)
 		checkError(err, 0)
@@ -156,7 +182,7 @@ func handleArgs(args []string) ([]string, error) {
 			return nil, err
 		}
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		sortedArgs[1] = ifconfigPotentialName
+		sortedArgs[1] = interfaceArg
 		sortedArgs[2] = ifconfigCIDRTmp
 		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
@@ -171,24 +197,35 @@ func handleArgs(args []string) ([]string, error) {
 	} else {
 		matchHTTPS, err := regexp.MatchString(httpsRegex.String(), regexSafeArgs)
 		checkError(err, 0)
+		interfaces, err := net.Interfaces()
+		checkError(err, 0)
 		tmpReduced := httpRegex.ReplaceAllString(regexSafeArgs, "")
 		tmpReduced = ipRegex.ReplaceAllString(tmpReduced, "")
 		tmpReduced = portRegex.ReplaceAllString(tmpReduced, "")
 		tmpReduced = tlsRegex.ReplaceAllString(tmpReduced, "")
-		ifconfigPotentialName := strings.ReplaceAll(tmpReduced, "#", "")
-		ifconfig, err := net.InterfaceByName(ifconfigPotentialName)
+		interfaceArg := strings.ReplaceAll(tmpReduced, "#", "")
+		for _, i := range interfaces {
+			if i.Name == interfaceArg {
+				matchInterface = true
+			}
+		}
+		if matchInterface != true {
+			err := fmt.Errorf("There is no interface named: %s", interfaceArg)
+			checkError(err, 0)
+		}
+		ifconfig, err := net.InterfaceByName(interfaceArg)
 		checkError(err, 0)
 		ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig)
 		checkError(err, 0)
 		matchTLS, err := regexp.MatchString(tlsRegex.String(), regexSafeArgs)
 		checkError(err, 0)
-		httpsAllMatched := matchHTTPS && matchIP && matchPort && matchTLS
+		httpsAllMatched := matchHTTPS && matchIP && matchPort && matchTLS && matchInterface
 		if !httpsAllMatched {
 			err := fmt.Errorf("Arguments provided are %v: %v", httpsAllMatched, args)
 			return nil, err
 		}
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		sortedArgs[1] = ifconfigPotentialName
+		sortedArgs[1] = interfaceArg
 		sortedArgs[2] = ifconfigCIDRTmp
 		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
@@ -203,19 +240,20 @@ func handleArgs(args []string) ([]string, error) {
 }
 
 func main() {
-	var ipAddress, serverType, tlsInputStr string
-	//var netInterface string
+	var ipAddress, serverType, tlsInputStr, netInterface string
 	var portInt int
 	flag.StringVar(&tlsInputStr, "t", "None", "Provide TLS information delimited by a comma - requires server type: -s https")
 	flag.StringVar(&serverType, "s", "http", "Provide a server of type: http, https")
-	//flag.StringVar(&netInterface, "e", "lo:", "Provide a Network Interface - required!")
+	flag.StringVar(&netInterface, "e", "lo", "Provide a Network Interface - required!")
 	flag.StringVar(&ipAddress, "i", "127.0.0.1", "Provide a valid IPv4 address - required!")
 	flag.IntVar(&portInt, "p", 8443, "Provide a TCP port number - required!")
 	flag.Parse()
 
-	args, argsLen := flag.Args(), len(flag.Args())
+	args, argsLen := os.Args, len(os.Args)
 
-	if argsLen > 4 {
+	if argsLen > 9 {
+		flag.PrintDefaults()
+		fmt.Println()
 		err := fmt.Errorf("The number arguments provided was %d", argsLen)
 		checkError(err, 0)
 		os.Exit(1)
@@ -224,7 +262,6 @@ func main() {
 	sortedArgs, err := handleArgs(args)
 	checkError(err, 0)
 
-	// len +1 includes hostname checks
 	switch sortedArgs[0] {
 	case "http":
 		err := buildHTTPServer(sortedArgs)
