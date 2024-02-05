@@ -17,8 +17,7 @@ import (
 // Either: http or https server
 
 // TODO List TODO
-// BUILD AND BUILD
-// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
+// Check if binary is Called OmniServer - well is one way to make this just for CTFs I suppose
 // HTTP server
 // TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
 // go routine and channels
@@ -30,9 +29,144 @@ import (
 // Add all the profession stuff
 // - DONOT WORRY ABOUT nested regex -> string sorted args oneliners no (5||6)*2 additional variable declarations making that underreadable dense vertically and save some memory
 
-func buildHTTPServer(args []string) error {
-	fmt.Println("building HTTP")
-	return nil
+// Download file - filename
+func DownloadFileHandler(w http.ResponseWriter, r *http.Request) error {
+        // client := Headers - IP User-Agent
+        
+	requestedFile := 
+        if checkFileExists(requestedFile) {
+                
+
+
+
+		w.WriteHeader(404)
+                w.Write([]byte("404\n"))
+		// Use logging table template and then Fatal
+                log.Fatal("Failed to Download file: %s - requested by: %s, %s", requestedFile, clientIP, clientUA)
+                // Fail to download file error
+                return err
+        } else {
+                startTime := time.Now()
+                log.Printf("Downloading file at:  %s - requested by: %s, %s", requestedFile, clientIP, clientUA)
+        }
+        endTime := time.Now()
+        log.Printf("Successfully Download File - %s by %s\n", filename, clientIP, clientUA)
+        return nil
+}
+
+
+
+
+// Upload file - filename
+func UploadFileHandler(w http.ResponseWriter, r *http.Request) error {
+	
+        // Parse our multipart form, 10 << 20 specifies a maximum
+        // upload of 10 MB files.
+        //r.ParseMultipartForm(10 << 20)
+
+        // Get filename from body of r.Body
+
+        // FormFile returns the first file for the given key `myFile`
+        // it also returns the FileHeader so we can get the Filename,
+        // the Header and the size of the file
+
+        log.Printf("/upload/%s - Upload requested by ...", filename)
+        file, handler, err := r.FormFile()
+        if err != nil {
+                // Error retrieving file of filename
+                return err
+        }
+        startTime := time.Now()
+        defer file.Close()
+        //log.Print("",  ) File upload request success
+        //log.Print("",  ) File upload INFO:
+        log.Printf("Uploaded File: %+v\n", filename)
+        lof.Printf("File Size: %+v\n", fileSize)
+        log.Printf("MIME Header: %+v\n", mimeHeader)
+
+        //log.Print("",  ) File upload request success
+
+        // Create a temporary file within our temp-images directory that conforms to a naming scheme
+        tempFile, err := os.TempFile(tmpUploadDir, "tmp-")
+        if err != nil {
+                // Error creating temporary file
+                return err
+        }
+        defer tempFile.Close()
+
+        // read all of the contents of our uploaded file into a byte array
+        fileBytes, err := os.ReadFile(file)
+        if err != nil {
+                // Failed to read file being uploaded to byte array
+                return err
+        }
+        // write this byte array to our temporary file
+        tempFile.Write(fileBytes)
+        endTime := time.Now()
+        //Return that we have successfully uploaded our file!
+        log.Printf("Successfully Uploaded File - %s \n", filename)
+        fmt.Fprintf(w, "Successfully Uploaded File - %s \n", filename)
+        return nil
+}
+
+
+
+func saveReqBodyFileHandler(r *http.Request) error {
+        builder := strings.Builder()
+        startTime := time.Now()
+        builder.WriteString(os.TempDir())
+        builder.WriteString("/")
+        builder.WriteString(strings.ReplaceAll(r.RemoteAddr, ".", "-")
+	builder.WriteString("-T-")
+        builder.WriteString(strconv.Itoa(int(time.Now().Unix())))
+        filepath := builder.String()
+        err := os.Create(filepath,  0644)
+        if err != nil {
+                log.Fatal(err)
+                return err
+        }
+        err := io.Copy(filepath, r.Body)
+        if err != nil {
+                log.Fatal(err)
+                return err
+        }
+        defer f.Close()
+	builder.Flush()
+        endTime := time.Now()
+	log.Println("Entire process of file creation for file upload: %v - took from: %v till %v",filepath, startTime, endTime)
+        return nil
+}
+
+func createDefaultWebServerMux() *ServerMux {
+        mux := http.NewServeMux()
+        mux.HandleFunc("/upload", uploadFileHandler())
+        mux.HandleFunc("/download", downloadFileHandler())
+        mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler())
+        return mux
+}
+
+func initServerContext(lportString, keyServerAddr string, srvMux *ServerMux) (*http.Server, Context, CancelFunc, error) {
+        ctx, cancelCtx := context.WithCancel(context.Background())
+        server := &http.Server{
+                Addr:    lportString,
+                Handler: srvMux,
+                BaseContext: func(l net.Listener) context.Context {
+                        ctx = context.WithValue(ctx, keyServerAddr, l.Addr().String())
+                        return ctx
+                },
+        }
+        return server, ctx, cancelCtx, nil
+}
+
+
+func buildHTTPServer(args []string) (*http.Server, Context, CancelFunc, error) {
+	log.Println("Building HTTP")
+	mux := createDefaultWebServerMux()
+	log.Println("Mux for %v created", args) 
+ 	httpServer, ctx, cancelCtx, err := initServerContext(args[4], ,mux)	
+	checkError(err)
+	log.Println("Server Built for %v created", httpServer) 
+	return httpServer, ctx, cancelCtx, nil
 }
 func runHTTPServer() error {
 	fmt.Println("running HTTP")
@@ -125,7 +259,7 @@ func convIfconfigNameToCIDR(ifconfig *net.Interface) (string, error) {
 }
 
 func removeFlagsAndBinFromArgs(hashDelimitedArgs string) string {
-	binRegex := regexp.MustCompile(`#.[\/]OmniServer#`)
+	binRegex := regexp.MustCompile(`#.[\/]OmniServer#`) // This is just for CTFs please :)
 	flagsRegex := regexp.MustCompile(`-\w{1}#`)
 	rmBinRegexStr := binRegex.ReplaceAllString(hashDelimitedArgs, "")
 	result := flagsRegex.ReplaceAllString(rmBinRegexStr, "")
