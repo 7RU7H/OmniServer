@@ -1,78 +1,58 @@
 # Dev 
 
-- Goals:
-    - Complete the webserver
-        - What is manditory and not - if not add to dev/{feature}
-    - Move all wild ideas in the dev/{feature} structure
-    - Any more wild ideas go in he appropriate directory
-    - What do I need to do?
-        - args 
-        - make cli app part modular - so I do not have to program it - to the app without breaking anything 
-        - handler - serverTypes WebServer http, https !! DO NOT ADD ANYTHING ELSE
-        - TLS
-            - openssl command
-            - import a cert
-    - End up at the winchester have the next update ideas in order of:
-        - console && cmds Ninja Shell be mergable into the cli code for the next major update.
-        - ProxyServer type
-        - MITMListener type
-        - RogueDNS/LDAP     
+Problem breaking them down to what need to be done
+- Temp to normal files https://gobyexample.com/temporary-files-and-directories
+
+- Define the NewRequestmethod with contexts for each
+- upload, download and savereqbody - https://pkg.go.dev/net/http#example-FileServer
+
+- Write into files and read file for /download 
+- Would kind of like json because why not - https://www.alexedwards.net/blog/how-to-properly-parse-a-json-request-body
+
+- Contexts: https://medium.com/@jamal.kaksouri/the-complete-guide-to-context-in-golang-efficient-concurrency-management-43d722f6eaea
+- Follow the best practices 
+- Timeout for connect - https://gobyexample.com/context
+- Deadline for upload and requestbody
+- Progating context with go routines
+- canceling
+- read - https://www.digitalocean.com/community/tutorials/how-to-use-contexts-in-go
 
 
-Flow
-- main -> handleArgs 
-- handleArgs.go marshals data to struct (to initStruc)
-    - SetDefaultConfig() to force no nil values
-    - InitSeverFromArgs (instead from InitServerStruct)
-    - metahandler.SelectAction(s *Server runFlag) 
-- metahandler (to do the heavy lifting )
-    - SelectAction
-    - Actions...
-    - metahandler  and create/start/stop/config passing ServerType and some flag to (console would fit in here: either run create server or goto Console)
-    - NOT SURE ABOUT CONFIG
-- web ( because web is the priority)
-- http
-- either http OR tls and https
+- Make sure I am good https://www.digitalocean.com/community/tutorials/how-to-make-an-http-server-in-go
 
-Concerns:
-- Going overboard with args
-- Logging
+- Shutdown server https://pkg.go.dev/net/http#example-Server.Shutdown
 
+- Final Writeup all my golang knownledge from this into Archive
 
-
-
-Todo
-1. main.go : args - make new main, compare struct in metahandler, test variables in main to create commands:
-    - http
-    - https   
-2. metahandler : args -> marshalToStruct -> Selection -> create/start/stop/config -> Graceful Exit
-3. Web -> http / https - if I start by categorising at this level it make the above less cluttered and forces modularity of the sub categorises
-4. HTTP
-5. HTTPS <-> TLS
-
-
-Comments cleaning
 ```go
+// CLI -> if http else https -> Done - just simple done project - below is just a map of functions - see TODO idiot
+// main -> handleArgs -> main
+// switch on sortedArray -> subchecks on sortedArray size
+// Either: http or https server
 
-//
-//
-// (NAME OF CONCEPT THAT MANAGES) -> server1,server2,...
-// Seperation of the methods as I am double server and IDdatabase
-// X-server: web-server.go, proxy-server.go
-// CURRENT IDEA Database needs to be:
-// - part of larger struct that: map[string](pointer) points to Server structs, ID database etc 
-// - initialisation of array to make ID database - ID need negative space for stopped servers
-// 
+// TODO List TODO
+// HTTP server
+// Error ids and code - id for where in the source for no lost in the src and code for switch case fatal or not
 
-// Are negative ID is a good way of managing this why not flags
-//
-       
-// 
-// Creation to termination 
-// Memory Arenas
+// TLS is not that much more 
+// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
+// Application end - start time printTotalRuntime()
+// TLS - regex requred that make sense, validationTLS(), how validateTLS passes data to buildHTTPS()
+// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
+// runHTTPSserver()
 
-// 
-// IDs
-// Memory Arenas and how.. 
-// 
+    log.Printf("About to listen on 8443. Go to https://127.0.0.1:8443/")
+	err := http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil)
+	log.Fatal(err)
+
+// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
+// Add all the profession stuff
+// - Make authentication actually work without any other packages
+// - Hijacker? https://pkg.go.dev/net/http#example-Hijacker 
+// - Colourful Banner!
+// - DO NOT WORRY ABOUT nested regex -> string sorted args oneliners no (5||6)*2 additional variable declarations making that underreadable dense vertically and save some memory
+
+
+
+
 ```

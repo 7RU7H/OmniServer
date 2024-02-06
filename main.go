@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -22,6 +21,7 @@ import (
 
 // TODO List TODO
 // HTTP server
+
 // Error ids and code - id for where in the source for no lost in the src and code for switch case fatal or not
 // TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
 // Application end - start time printTotalRuntime()
@@ -37,7 +37,8 @@ import (
 // - DONOT WORRY ABOUT nested regex -> string sorted args oneliners no (5||6)*2 additional variable declarations making that underreadable dense vertically and save some memory
 
 // Download file - filename
-func DownloadFileHandler(w http.ResponseWriter, r *http.Request) error {
+func downloadFileHandler(w http.ResponseWriter, r *http.Request) error {
+	http.FileServer(http.Dir("/tmp"))
 	// client := Headers - IP User-Agent
 
 	requestedURL := ""
@@ -56,13 +57,13 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) error {
 		log.Printf("Downloading file at: %v from: %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
 	}
 	endTime := time.Now()
-	log.Printf("Successfully Downloaded File - %v by %v - %v\n", requestedFile, clientIP, clientMAC)
+	log.Printf("Successfully Downloaded File - %v by %v - %v ; Started: %v and Ended %v\n", requestedFile, clientIP, clientMAC, startTime, endTime)
 	return nil
 }
 
 // TODO
-func UploadFileHandler(w http.ResponseWriter, r *http.Request) error {
-
+func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+	http.FileServer(http.Dir("/tmp"))
 	// Parse our multipart form, 10 << 20 specifies a maximum
 	// upload of 10 MB files.
 	//r.ParseMultipartForm(10 << 20)
@@ -72,48 +73,37 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) error {
 	// FormFile returns the first file for the given key `myFile`
 	// it also returns the FileHeader so we can get the Filename,
 	// the Header and the size of the file
+	filename := r.FormValue()
 
 	log.Printf("/upload/%s - Upload requested by ...", filename)
-	file, handler, err := r.FormFile()
-	if err != nil {
-		// Error retrieving file of filename
-		return err
-	}
-	startTime := time.Now()
+	file, handler, err := r.FormFile(filename)
+	checkError(err, 0)
 	defer file.Close()
 	//log.Print("",  ) File upload request success
 	//log.Print("",  ) File upload INFO:
 	log.Printf("Uploaded File: %+v\n", filename)
-	lof.Printf("File Size: %+v\n", fileSize)
+	log.Printf("File Size: %+v\n", fileSize)
 	log.Printf("MIME Header: %+v\n", mimeHeader)
 
 	//log.Print("",  ) File upload request success
 
 	// Create a temporary file within our temp-images directory that conforms to a naming scheme
-	tempFile, err := os.TempFile(tmpUploadDir, "tmp-")
-	if err != nil {
-		// Error creating temporary file
-		return err
-	}
+	tempFile, err := os.CreateTemp("/tmp", "tmp-")
+	checkError(err, 0)
 	defer tempFile.Close()
+	defer os.Remove(tempFile.Name())
 
-	// read all of the contents of our uploaded file into a byte array
 	fileBytes, err := os.ReadFile(file)
-	if err != nil {
-		// Failed to read file being uploaded to byte array
-		return err
-	}
-	// write this byte array to our temporary file
+	checkError(err, 0)
 	tempFile.Write(fileBytes)
-	endTime := time.Now()
-	//Return that we have successfully uploaded our file!
+
 	log.Printf("Successfully Uploaded File - %s \n", filename)
-	fmt.Fprintf(w, "Successfully Uploaded File - %s \n", filename)
-	return nil
 }
 
-func saveReqBodyFileHandler(r *http.Request) error {
-	builder := strings.Builder()
+func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) {
+	http.FileServer(http.Dir("/tmp"))
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+	builder := strings.Builder{}
 	startTime := time.Now()
 	builder.WriteString(os.TempDir())
 	builder.WriteString("/")
@@ -121,36 +111,30 @@ func saveReqBodyFileHandler(r *http.Request) error {
 	builder.WriteString("-T-")
 	builder.WriteString(strconv.Itoa(int(time.Now().Unix())))
 	filepath := builder.String()
-	err := os.Create(filepath, 0644)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-	err := io.Copy(filepath, r.Body)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
+	builder.Reset()
+	f, err := os.Create(filepath)
+	checkError(err, 0)
 	defer f.Close()
-	builder.Flush()
+	f.WriteString(r.Body.Close().Error())
+	f.Sync()
+
 	endTime := time.Now()
 	log.Println("Entire process of file creation for file upload: %v - took from: %v till %v", filepath, startTime, endTime)
-	return nil
 }
 
-func createDefaultWebServerMux() *ServerMux {
+func createDefaultWebServerMux() *http.ServerMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/upload", uploadFileHandler())
-	mux.HandleFunc("/download", downloadFileHandler())
-	mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler())
+	mux.HandleFunc("/upload", uploadFileHandler)
+	mux.HandleFunc("/download", downloadFileHandler)
+	mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler)
 	return mux
 }
 
-func initServerContext(lportString, keyServerAddr string, srvMux *http.ServerMux) (*http.Server, context.Context, context.CancelFunc, error) {
+func initServerContext(lportString, keyServerAddr string) (*http.Server, context.Context, context.CancelFunc, error) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	server := &http.Server{
 		Addr:    lportString,
-		Handler: srvMux,
+		Handler: createDefaultWebServerMux(),
 		BaseContext: func(l net.Listener) context.Context {
 			ctx = context.WithValue(ctx, keyServerAddr, l.Addr().String())
 			return ctx
@@ -159,29 +143,20 @@ func initServerContext(lportString, keyServerAddr string, srvMux *http.ServerMux
 	return server, ctx, cancelCtx, nil
 }
 
-func buildHTTPServer(args []string) (*http.Server, context.Context, context.CancelFunc, error) {
+func runHTTPServer(args []string) (*http.Server, context.Context, context.CancelFunc, error) {
 	log.Println("--- Building HTTP Server ---")
-	mux := createDefaultWebServerMux()
-	log.Println("Mux for %v created", args)
-	httpServer, ctx, cancelCtx, err := initServerContext(args[4], args[3], mux)
+	httpServer, ctx, cancelCtx, err := initServerContext(args[4], args[3])
 	checkError(err, 0)
 	log.Println("--- Server Built for %v created ---", httpServer)
 	return httpServer, ctx, cancelCtx, nil
 }
-func runHTTPServer(*http.Server, context.Context, context.CancelFunc) error {
-	fmt.Println("running HTTP")
-	return nil
-}
+
 func validateTLS(args string) (string, error) {
 	fmt.Println("validating TLS")
 	return "TLS incoming", nil
 }
 
-func buildHTTPSServer(nontlsArgs []string, tls string) error {
-	fmt.Println("building HTTPS")
-	return nil
-}
-func runHTTPSServer() error {
+func runHTTPSServer(nontlsArgs []string, tls string) error {
 	fmt.Println("running HTTPS")
 	return nil
 }
