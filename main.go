@@ -14,31 +14,11 @@ import (
 	"time"
 )
 
-// CLI -> if http else https -> Done - just simple done project - below is just a map of functions - see TODO idiot
-// main -> handleArgs -> main
-// switch on sortedArray -> subchecks on sortedArray size
-// Either: http or https server
+func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	wd, err := os.Getwd()
+	checkError(err, 0)
+	http.FileServer(http.Dir(wd))
 
-// TODO List TODO
-// HTTP server
-
-// Error ids and code - id for where in the source for no lost in the src and code for switch case fatal or not
-// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
-// Application end - start time printTotalRuntime()
-// go routine and channels
-// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
-// TLS - regex requred that make sense, validationTLS(), how validateTLS passes data to buildHTTPS()
-// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
-// runHTTPSserver()
-// TODO AFTER THE ABOVE IS COMPLETE built and works no excuses:
-// Add all the profession stuff
-// - Make authentication actually work without any other packages
-// - Colourful Banner!
-// - DONOT WORRY ABOUT nested regex -> string sorted args oneliners no (5||6)*2 additional variable declarations making that underreadable dense vertically and save some memory
-
-// Download file - filename
-func downloadFileHandler(w http.ResponseWriter, r *http.Request) error {
-	http.FileServer(http.Dir("/tmp"))
 	// client := Headers - IP User-Agent
 
 	requestedURL := ""
@@ -46,24 +26,31 @@ func downloadFileHandler(w http.ResponseWriter, r *http.Request) error {
 	clientIP := ""
 	clientMAC := ""
 	clientUA := ""
-	exists, err := checkFileExists(requestedFile)
+	pathToRequestedFile := wd + requestedFile
+	exists, err := checkFileExists(pathToRequestedFile)
+	checkError(err, 0)
 	if !exists {
 		http.NotFound(w, r)
-		log.Println("Failed to Download file: %v from %v - requested by: %v, %v, %v", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
-		return err
+		log.Printf("Failed to Download file: %v from %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
 	} else {
-		startTime := time.Now()
 		http.ServeFile(w, r, requestedFile)
 		log.Printf("Downloading file at: %v from: %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
 	}
-	endTime := time.Now()
-	log.Printf("Successfully Downloaded File - %v by %v - %v ; Started: %v and Ended %v\n", requestedFile, clientIP, clientMAC, startTime, endTime)
-	return nil
+	log.Printf("Successfully Downloaded File - %v by %v - %v ; Started: %v and Ended %v\n", requestedFile, clientIP, clientMAC)
+}
+
+func lsTmpDir() {
+	tmpDir := os.TempDir()
+	output, err := os.ReadDir(tmpDir)
+	checkError(err, 0)
+	log.Printf("The contents of the host system's temporary directory: %s", output)
 }
 
 // TODO
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	http.FileServer(http.Dir("/tmp"))
+	tmpDir := os.TempDir()
+	http.FileServer(http.Dir(tmpDir))
+	log.Printf("File server started at %s\n", tmpDir)
 	// Parse our multipart form, 10 << 20 specifies a maximum
 	// upload of 10 MB files.
 	//r.ParseMultipartForm(10 << 20)
@@ -75,29 +62,41 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	// the Header and the size of the file
 	filename := r.FormValue()
 
-	log.Printf("/upload/%s - Upload requested by ...", filename)
-	file, handler, err := r.FormFile(filename)
+	log.Printf("/upload/%s - Upload requested by ...\n", filename)
+	file, fileHeader, err := r.FormFile(filename)
 	checkError(err, 0)
 	defer file.Close()
+	// Check File header!
+
+	fileHeader
+
 	//log.Print("",  ) File upload request success
 	//log.Print("",  ) File upload INFO:
 	log.Printf("Uploaded File: %+v\n", filename)
 	log.Printf("File Size: %+v\n", fileSize)
 	log.Printf("MIME Header: %+v\n", mimeHeader)
-
 	//log.Print("",  ) File upload request success
 
-	// Create a temporary file within our temp-images directory that conforms to a naming scheme
-	tempFile, err := os.CreateTemp("/tmp", "tmp-")
+	// Create a temporary file tmp directory that conforms to a naming scheme
+	tempFile, err := os.CreateTemp(tmpDir, "tmp-")
 	checkError(err, 0)
 	defer tempFile.Close()
 	defer os.Remove(tempFile.Name())
-
-	fileBytes, err := os.ReadFile(file)
-	checkError(err, 0)
-	tempFile.Write(fileBytes)
+	// Write to the temporary file
 
 	log.Printf("Successfully Uploaded File - %s \n", filename)
+	currTmpFile := tmpDir + tempFile.Name()
+	fileBytes, err := os.ReadFile(currTmpFile)
+	checkError(err, 0)
+	// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
+	wdDir, err := os.Getwd()
+	checkError(err, 0)
+	wdDirAndFilename := wdDir + filename
+	err = os.WriteFile(wdDirAndFilename, fileBytes, 611)
+	checkError(err, 0)
+	defer log.Printf("Successfully save uploaded temporary file: %s to %s\n", currTmpFile, wdDirAndFilename)
+	defer log.Printf("Successfully removed temporary file: %s\n", currTmpFile)
+	defer lsTmpDir()
 }
 
 func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) {
@@ -119,10 +118,10 @@ func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) {
 	f.Sync()
 
 	endTime := time.Now()
-	log.Println("Entire process of file creation for file upload: %v - took from: %v till %v", filepath, startTime, endTime)
+	defer log.Println("Entire process of file creation for file upload: %v - took from: %v till %v", filepath, startTime, endTime)
 }
 
-func createDefaultWebServerMux() *http.ServerMux {
+func createDefaultWebServerMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upload", uploadFileHandler)
 	mux.HandleFunc("/download", downloadFileHandler)
@@ -347,6 +346,13 @@ func handleArgs(args []string) ([]string, error) {
 		return sortedArgs, nil
 	}
 }
+
+func printBanner() {
+	fmt.Printf("Flashy nice colorful banner with lots of 💀s")
+	fmt.Printf("Beware this program uses http.ServeFileFS() visit https://pkg.go.dev/net/http#ServeFileFS - meaning that ANY file can be downloaded if requested and exists\n")
+	fmt.Printf("💀 ...This Program is for CTFs - Happy Hacking :) ... 💀")
+}
+
 func printTotalRuntime(appStartTime time.Time) {
 	appTerminateTime := time.Now()
 	totalRuntime := 0
@@ -355,6 +361,7 @@ func printTotalRuntime(appStartTime time.Time) {
 }
 
 func main() {
+	printBanner()
 	var ipAddress, serverType, tlsInputStr, netInterface string
 	var portInt int
 	flag.StringVar(&tlsInputStr, "t", "None", "Provide TLS information delimited by a comma - requires server type: -s https")
@@ -363,7 +370,6 @@ func main() {
 	flag.StringVar(&ipAddress, "i", "127.0.0.1", "Provide a valid IPv4 address - required!")
 	flag.IntVar(&portInt, "p", 8443, "Provide a TCP port number - required!")
 	flag.Parse()
-	// Banner !!
 
 	appStartTime := time.Now()
 	args, argsLen := os.Args, len(os.Args)
@@ -381,9 +387,7 @@ func main() {
 
 	switch sortedArgs[0] {
 	case "http":
-		httpServer, ctx, cancelCtx, err := buildHTTPServer(sortedArgs)
-		checkError(err, 0)
-		err = runHTTPServer(httpServer, ctx, cancelCtx)
+		err := runHTTPServer(sortedArgs)
 		checkError(err, 0)
 		err = gracefulExit()
 		checkError(err, 0)
@@ -391,14 +395,11 @@ func main() {
 	case "https":
 		tlsReq, err := validateTLS(sortedArgs[5])
 		checkError(err, 0)
-		err = buildHTTPSServer(sortedArgs[0:4], tlsReq)
-		checkError(err, 0)
-		err = runHTTPSServer()
+		err = runHTTPSServer(sortedArgs[:4], tlsReq)
 		checkError(err, 0)
 		err = gracefulExit()
 		checkError(err, 0)
 		break
-
 	default:
 		err := fmt.Errorf("Invalid Sorted arguments and proof at index 0: %s", sortedArgs[0])
 		checkError(err, 0)
