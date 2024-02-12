@@ -15,11 +15,11 @@ import (
 	"runtime"
 )
 
+//
+//
 func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	wd, err := os.Getwd()
 	checkError(err, 0)
-	fs 
-	http.ServerFileFS(w,r, ))
 
 	// client := Headers - IP User-Agent
 
@@ -33,10 +33,10 @@ func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	checkError(err, 0)
 	if !exists {
 		http.NotFound(w, r)
-		log.Printf("Failed to Download file: %v from %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
+		defer log.Printf("Failed to Download file: %v from %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
 	} else {
-		http.ServeFile(w, r, requestedFile)
-		log.Printf("Downloading file at: %v from: %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
+		fs, err := http.ServerFileFS(w,r, ))
+		defer log.Printf("Downloading file at: %v from: %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
 	}
 	log.Printf("Successfully Downloaded File - %v by %v - %v ; Started: %v and Ended %v\n", requestedFile, clientIP, clientMAC)
 }
@@ -48,21 +48,27 @@ func lsTmpDir() {
 	log.Printf("The contents of the host system's temporary directory: %s", output)
 }
 
-func sha256AFile(filepath string) (string, error) {
+func sha256AFile(filepath string) (result string, error) {
 	os := runtime.GOOS
 	switch os {
 	case "windows":
-		cmd := exec.Command("certutil.exe","-hashfile",filepath)
+		cmd := exec.Command("certutil.exe","-hashfile",filepath,"SHA256")
 		output,err := cmd.CombinedOuput()
 		checkError(err,0)
+		outputAsString := string(output)
+		outputSlice:= strings.Split(outputAsString, "\n")
+		result = outputSlice[1]
 	case "linux":
 		cmd := exec.Command("sha256sum","",filepath)
 		output,err := cmd.CombinedOuput()
 		checkError(err,0)
+		outputAsString := string(output)
+		outputSlice:= strings.Split(outputAsString, " ")
+		result = outputSlice[0]
 	default:
 		err := fmt.Errorf("The OS %s is unsupported for hashing files with sha256", os)
 	}
-	return string(output), nil
+	 return result, nil
 }
 
 func reverseShell(shell,args, payload string) error {
@@ -246,12 +252,19 @@ func prependColonToPortNumber(port string) string {
 
 // Everything is fatal till EVERYTHING WORKS relax those switch statement fingers custom error switch
 // Use regex `(err, \d)` to find and change incrementally later - the error code make life easier after all ALWAYS err.New or err.Errorf
+// 
+// A list of cases for need different err,0,0 
+//
+// Some things are not FATAL
+// Some things are are FATAL
+// http.Writer Errors need to return based on needing to respond 
 func checkError(err error, errorCode int) {
 	if err != nil {
 		log.Fatal(err, " - Error code: ", errorCode)
 	}
 }
 
+// TODO This is not connected to the design - fix
 func checkFileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err != nil {
