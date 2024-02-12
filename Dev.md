@@ -1,10 +1,21 @@
 # Dev 
 
+## Thanks to 
+
+https://www.zupzup.org/go-http-file-upload-download/index.html
+
+
+
+
+
 Problem breaking them down to what need to be done
 - Temp to normal files https://gobyexample.com/temporary-files-and-directories
 
 - Define the NewRequestmethod with contexts for each
 - upload, download and savereqbody - https://pkg.go.dev/net/http#example-FileServer
+
+- HEADERS
+- Publickey HEADER - spit out on startup
 
 - Write into files and read file for /download 
 - Would kind of like json because why not - https://www.alexedwards.net/blog/how-to-properly-parse-a-json-request-body

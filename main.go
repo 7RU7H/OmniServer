@@ -12,12 +12,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"runtime"
 )
 
 func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	wd, err := os.Getwd()
 	checkError(err, 0)
-	http.FileServer(http.Dir(wd))
+	fs 
+	http.ServerFileFS(w,r, ))
 
 	// client := Headers - IP User-Agent
 
@@ -26,7 +28,7 @@ func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	clientIP := ""
 	clientMAC := ""
 	clientUA := ""
-	pathToRequestedFile := wd + requestedFile
+	//pathToRequestedFile := wd + requestedFile
 	exists, err := checkFileExists(pathToRequestedFile)
 	checkError(err, 0)
 	if !exists {
@@ -46,29 +48,53 @@ func lsTmpDir() {
 	log.Printf("The contents of the host system's temporary directory: %s", output)
 }
 
-// TODO
+func sha256AFile(filepath string) (string, error) {
+	os := runtime.GOOS
+	switch os {
+	case "windows":
+		cmd := exec.Command("certutil.exe","-hashfile",filepath)
+		output,err := cmd.CombinedOuput()
+		checkError(err,0)
+	case "linux":
+		cmd := exec.Command("sha256sum","",filepath)
+		output,err := cmd.CombinedOuput()
+		checkError(err,0)
+	default:
+		err := fmt.Errorf("The OS %s is unsupported for hashing files with sha256", os)
+	}
+	return string(output), nil
+}
+
+func reverseShell(shell,args, payload string) error {
+	os := runtime.GOOS
+	switch os {
+	case "windows": 
+		cmd := exec.Command(shell, args, payload)
+		err := cmd.Run()
+		checkError(err,0)
+		return nil
+	case "linux":
+		cmd := exec.Command(shell, args, payload)
+		err := cmd.Run()
+		return nil 
+	default:
+		err := fmt.Errorf("The provided Shell: %s ---- Args: %s ---- Payload: %s ---- were incorrect in some way", shell, args, payload)
+		checkError(err,0)
+	}
+	return err
+}
+
+// TODO - Thinking about errors
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+	maxUploadSize := 10 * 1024 // 10 Mb
 	tmpDir := os.TempDir()
-	http.FileServer(http.Dir(tmpDir))
-	log.Printf("File server started at %s\n", tmpDir)
-	// Parse our multipart form, 10 << 20 specifies a maximum
-	// upload of 10 MB files.
-	//r.ParseMultipartForm(10 << 20)
+	fs := http.FileServer(http.Dir(tmpDir))
+	log.Printf("File server started at %s for uploading files\n", tmpDir)
+	
+	// publicKey Header
+	// filename Header
 
-	// Get filename from body of r.Body
-
-	// FormFile returns the first file for the given key `myFile`
-	// it also returns the FileHeader so we can get the Filename,
-	// the Header and the size of the file
-	filename := r.FormValue()
-
-	log.Printf("/upload/%s - Upload requested by ...\n", filename)
-	file, fileHeader, err := r.FormFile(filename)
-	checkError(err, 0)
-	defer file.Close()
-	// Check File header!
-
-	fileHeader
+	uploadFileArgs := w.Header().Get()
 
 	//log.Print("",  ) File upload request success
 	//log.Print("",  ) File upload INFO:
@@ -76,6 +102,33 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("File Size: %+v\n", fileSize)
 	log.Printf("MIME Header: %+v\n", mimeHeader)
 	//log.Print("",  ) File upload request success
+
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+    	log.Printf("Could not parse multipart form: %v\n", err)
+    	//renderError(w, "CANT_PARSE_FORM", http.StatusInternalServerError) // DO I want to send errors out - compile flags!
+	}
+	fileType := r.PostFormValue("type")
+	file, fileheader, err := r.FormFile(uploadFileArgs)
+    if err != nil {
+        //renderError(w, "INVALID_FILE", http.StatusBadRequest)
+	}
+	log.Printf("/upload/%s - Upload requested by ...\n", )
+	defer file.Close()
+	fileSize := fileHeader.Size
+	log.Printf("File size (bytes): %v\n", fileSize)
+	if fileSize > maxUploadSize {
+	renderError(w, "FILE_TOO_BIG", http.StatusBadRequest)
+	}
+	detectedFileType := http.DetectContentType(fileBytes)
+	switch detectedFileType {
+	case "", "":
+		  log.Printf("No file type detected by Go STDLIB http.DetectContentType - first 512 bytes parsed")
+		  log.Printf("This section is here in case of modification based of requiring specific file types")
+		  break
+	default:
+		log.Printf("The detected file type by OmniServer's use of go's http.DetectContentType was: %s", detectedFileType)
+		//renderError(w, "INVALID_FILE_TYPE", http.StatusBadRequest)
+    }
 
 	// Create a temporary file tmp directory that conforms to a naming scheme
 	tempFile, err := os.CreateTemp(tmpDir, "tmp-")
@@ -85,15 +138,33 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	// Write to the temporary file
 
 	log.Printf("Successfully Uploaded File - %s \n", filename)
+	
+	// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
+	// shaa256 hashing for the file also adds a layer of checks regarding packet skull hole-pokery that prevent worms to prevent file compromise  
 	currTmpFile := tmpDir + tempFile.Name()
 	fileBytes, err := os.ReadFile(currTmpFile)
 	checkError(err, 0)
-	// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
-	wdDir, err := os.Getwd()
+	uploadPath, err := os.Getwd()
 	checkError(err, 0)
-	wdDirAndFilename := wdDir + filename
+	hashedFilename := sha256AFile() // 
+	wdDirAndFilename := wdDir + hashedFilename 
 	err = os.WriteFile(wdDirAndFilename, fileBytes, 611)
 	checkError(err, 0)
+
+	fileEndings, err := mime.ExtensionsByType(detectedFileType)
+	if err != nil {
+    //renderError(w, "CANT_READ_FILE_TYPE", http.StatusInternalServerError)
+	}
+	log.Printf("FileType: %s, File: %s\n", detectedFileType, newPath)
+	newFile, err := os.Create(newPath)
+	if err != nil {
+		//renderError(w, "CANT_WRITE_FILE", http.StatusInternalServerError)
+	}
+	defer newFile.Close()
+	if _, err := newFile.Write(fileBytes); err != nil {
+		// renderError(w, "CANT_WRITE_FILE", http.StatusInternalServerError)
+	}
+
 	defer log.Printf("Successfully save uploaded temporary file: %s to %s\n", currTmpFile, wdDirAndFilename)
 	defer log.Printf("Successfully removed temporary file: %s\n", currTmpFile)
 	defer lsTmpDir()
@@ -160,7 +231,7 @@ func runHTTPSServer(nontlsArgs []string, tls string) error {
 	return nil
 }
 
-func gracefulExit() error {
+func gracefulExit(server *http.Server, context context.Context, cancel context.CancelFunc) error {
 	fmt.Println("SIG THIS or something fanciy please!")
 	return nil
 }
@@ -387,17 +458,17 @@ func main() {
 
 	switch sortedArgs[0] {
 	case "http":
-		err := runHTTPServer(sortedArgs)
+		server, context, contextCancel, err := runHTTPServer(sortedArgs)
 		checkError(err, 0)
-		err = gracefulExit()
+		err = gracefulExit(server, context, contextCancel)
 		checkError(err, 0)
 		break
 	case "https":
 		tlsReq, err := validateTLS(sortedArgs[5])
 		checkError(err, 0)
-		err = runHTTPSServer(sortedArgs[:4], tlsReq)
+		server, context, contextCancel, err := runHTTPSServer(sortedArgs[:4], tlsReq)
 		checkError(err, 0)
-		err = gracefulExit()
+		err = gracefulExit(server, context, contextCancel)
 		checkError(err, 0)
 		break
 	default:
