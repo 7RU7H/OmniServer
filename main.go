@@ -113,6 +113,19 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+	fileEndings, err := mime.ExtensionsByType(detectedFileType)
+	if err != nil {
+    //renderError(w, "CANT_READ_FILE_TYPE", http.StatusInternalServerError)
+	}
+	log.Printf("FileType: %s, File: %s\n", detectedFileType, newPath)
+	newFile, err := os.Create(newPath)
+	if err != nil {
+		//renderError(w, "CANT_WRITE_FILE", http.StatusInternalServerError)
+	}
+	defer newFile.Close()
+	if _, err := newFile.Write(fileBytes); err != nil {
+		// renderError(w, "CANT_WRITE_FILE", http.StatusInternalServerError)
+	}
 	// publicKey Header
 	filename := r.PostFormValue("filename")
 	//fileSize := 
@@ -136,6 +149,7 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
         //renderError(w, "INVALID_FILE", http.StatusBadRequest)
 	}
 	log.Printf("/upload/%s - Upload requested by ...\n", )
+
 	defer file.Close()
 	fileSize := fileHeader.Size
 	log.Printf("File size (bytes): %v\n", fileSize)
@@ -160,33 +174,19 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	defer os.Remove(tempFile.Name())
 	// Write to the temporary file
 
-	log.Printf("Successfully Uploaded File - %s \n", filename)
-	
+	log.Printf("Successfully Uploaded File - %s \n", tempFile.Name())
 	// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
-	// shaa256 hashing for the file also adds a layer of checks regarding packet skull hole-pokery that prevent worms to prevent file compromise  
+	// sha256 hashing for the file also adds a layer of checks regarding packet skull hole-pokery that prevent worms to prevent file compromise  
 	currTmpFile := tmpDir + tempFile.Name()
 	fileBytes, err := os.ReadFile(currTmpFile)
 	checkError(err, 0)
 	uploadPath, err := os.Getwd()
 	checkError(err, 0)
 	hashedFilename := sha256AFile() // 
+	log.Printf("Coverting from temporary to regular File - %s to %s - a SHA256\n", tempFile.Name(), hashedFilename)
 	wdDirAndFilename := wdDir + hashedFilename 
 	err = os.WriteFile(wdDirAndFilename, fileBytes, 611)
 	checkError(err, 0)
-
-	fileEndings, err := mime.ExtensionsByType(detectedFileType)
-	if err != nil {
-    //renderError(w, "CANT_READ_FILE_TYPE", http.StatusInternalServerError)
-	}
-	log.Printf("FileType: %s, File: %s\n", detectedFileType, newPath)
-	newFile, err := os.Create(newPath)
-	if err != nil {
-		//renderError(w, "CANT_WRITE_FILE", http.StatusInternalServerError)
-	}
-	defer newFile.Close()
-	if _, err := newFile.Write(fileBytes); err != nil {
-		// renderError(w, "CANT_WRITE_FILE", http.StatusInternalServerError)
-	}
 
 	defer log.Printf("Successfully save uploaded temporary file: %s to %s\n", currTmpFile, wdDirAndFilename)
 	defer log.Printf("Successfully removed temporary file: %s\n", currTmpFile)

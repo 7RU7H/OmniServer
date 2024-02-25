@@ -3,9 +3,10 @@
 ## Thanks to 
 
 https://www.zupzup.org/go-http-file-upload-download/index.html
-
-
-
+https://github.com/mayth/go-simple-upload-server/blob/v2/pkg/server.go
+https://github.com/mjpclab/go-http-file-server
+https://developer20.com/add-header-to-every-request-in-go/
+https://lets-go.alexedwards.net/sample/02.04-customizing-http-headers.html
 
 
 Problem breaking them down to what need to be done
