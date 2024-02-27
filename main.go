@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+type ctxKey struct{}
+
 func downloadFileHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var requestedFile string
@@ -45,6 +47,7 @@ func downloadFileHandler() http.HandlerFunc {
 			defer log.Printf("Failed to Download file: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
 		} else {
 			fmt.Printf("Update to go 1.22!")
+			http.ServeFile(w, r, pathToRequestedFile)
 			//http.ServerFileFS(w, r, http.FileSystem, pathToRequestedFile)
 			defer log.Printf("Downloading file at: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
 		}
@@ -270,13 +273,13 @@ func createDefaultWebServerMux() *http.ServeMux {
 	return mux
 }
 
-func initServerContext(lportString, keyServerAddr string) (*http.Server, context.Context, context.CancelFunc, error) {
+func initServerContext(lportString, serverAddr string) (*http.Server, context.Context, context.CancelFunc, error) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	server := &http.Server{
-		Addr:    lportString,
+		Addr:    serverAddr + prependColonToPortNumber(lportString),
 		Handler: createDefaultWebServerMux(),
 		BaseContext: func(l net.Listener) context.Context {
-			ctx = context.WithValue(ctx, keyServerAddr, prependColonToPortNumber(lportString))
+			ctx = context.WithValue(ctx, ctxKey{}, lportString)
 			return ctx
 		},
 	}
@@ -306,7 +309,7 @@ func runHTTPSServer(nontlsArgs []string, tls string) (*http.Server, context.Cont
 }
 
 func gracefulExit(server *http.Server, context context.Context, cancel context.CancelFunc) error {
-	fmt.Println("SIG THIS or something fanciy please!")
+	fmt.Printf("SIG THIS or something fanciy please with: %+v, %+v, %+v\n", server, context, cancel)
 	return nil
 }
 

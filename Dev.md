@@ -14,6 +14,8 @@ upload and download properly - https://www.zupzup.org/go-http-file-upload-downlo
 Problem breaking them down to what need to be done
 - Temp to normal files https://gobyexample.com/temporary-files-and-directories - DONE
 
+- ctxKey for contexts - https://stackoverflow.com/questions/40891345/fix-should-not-use-basic-type-string-as-key-in-context-withvalue-golint
+
 - NOTE SURE:
 - Define the NewRequestmethod with contexts for each
 - upload, download and savereqbody - https://pkg.go.dev/net/http#example-FileServer
