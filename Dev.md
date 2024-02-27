@@ -2,12 +2,14 @@
 
 ## Thanks to 
 
-https://www.zupzup.org/go-http-file-upload-download/index.html
 https://github.com/mayth/go-simple-upload-server/blob/v2/pkg/server.go
 https://github.com/mjpclab/go-http-file-server
 https://developer20.com/add-header-to-every-request-in-go/
 https://lets-go.alexedwards.net/sample/02.04-customizing-http-headers.html
 
+
+upload and download properly - https://www.zupzup.org/go-http-file-upload-download/index.html - DONE
+- https://github.com/zupzup/golang-http-file-upload-download
 
 Problem breaking them down to what need to be done
 - Temp to normal files https://gobyexample.com/temporary-files-and-directories - DONE
