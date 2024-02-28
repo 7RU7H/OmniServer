@@ -20,10 +20,10 @@ func main() {
 	var listeningPort string
 	ipAddress := "127.0.0.1"
 	tlsCert := "/path/to/cert"
-	uploadPath := "/path/to/upload"
 	serverCertPath := "/path/to/cert"
 	serverKeyPath := "/path/to/cert"
 
+	uploadPath := "/path/to/upload"
 	appStartTime := time.Now()
 	// CLI - complete without console and cli implemented first dumby vars in main -> CLI
 	//banner := cli.Banner()

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -294,9 +295,83 @@ func runHTTPServer(args []string) (*http.Server, context.Context, context.Cancel
 	return httpServer, ctx, cancelCtx, nil
 }
 
-func validateTLS(args string) (string, error) {
+func trimFilePath(path string) (result string, err error) {
+	os := runtime.GOOS
+	switch os {
+	case "windows":
+		pathSlice := strings.SplitAfterN(path, "\\", -1)
+		result = pathSlice[len(pathSlice)-1]
+	case "linux":
+		pathSlice := strings.SplitAfterN(path, "/", -1)
+		result = pathSlice[len(pathSlice)-1]
+	default:
+		err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", os)
+		checkError(err, 0)
+		return "", err
+	}
+	return result, err
+}
+
+func validateTLS(args string) (string, string, error) {
 	log.Printf("Attempt to validate TLS arguments %s\n", args)
-	return "TLS incoming", nil
+	var tlsCert, tlsKey, certPath, keyPath string
+	os := runtime.GOOS
+	argsSlice := strings.SplitAfter(args, ",")
+	for i, arg := range argsSlice {
+		if strings.Contains(arg, ".key") {
+			keyPath = arg
+			certPath = argsSlice[i-1]
+		}
+	}
+
+	if keyPath == "" {
+		err := fmt.Errorf("no private key file in user provided args: $%s", args)
+		checkError(err, 0)
+		return "", "", err
+	}
+	if certPath == "" {
+		err := fmt.Errorf("assignment of private key and some certificate file not found in args: $%s", args)
+		checkError(err, 0)
+		return "", "", err
+	}
+
+	keyExists, err := checkFileExists(keyPath)
+	checkError(err, 0)
+	certExists, err := checkFileExists(certPath)
+	checkError(err, 0)
+	keyAndCertExist := keyExists && certExists
+	if !keyAndCertExist {
+		err := fmt.Errorf("either private key or certificate does not exist on the file system")
+		checkError(err, 0)
+		return "", "", err
+	}
+	tlsKey, err = trimFilePath(keyPath)
+	checkError(err, 0)
+
+	switch os {
+	case "windows":
+		tlsCert, err = trimFilePath(certPath)
+		checkError(err, 0)
+		if !(strings.Contains(tlsCert, ".cer") || strings.Contains(tlsCert, ".pem")) {
+			err := fmt.Errorf("invalid certificate file extension %s for os: %s", tlsCert, os)
+			checkError(err, 0)
+			return "", "", err
+		}
+	case "linux":
+		tlsCert, err = trimFilePath(certPath)
+		checkError(err, 0)
+		if !(strings.Contains(tlsCert, ".crt") || strings.Contains(tlsCert, ".pem")) {
+			err := fmt.Errorf("invalid certificate file extension %s for os: %s", tlsCert, os)
+			checkError(err, 0)
+			return "", "", err
+		}
+	default:
+		err := fmt.Errorf("invalid certificate arguments provided - no .crt,.pem,cer found: %s", args)
+		checkError(err, 0)
+		return "", "", err
+	}
+
+	return tlsCert, tlsKey, nil
 }
 
 func runHTTPSServer(nontlsArgs []string, tls string) (*http.Server, context.Context, context.CancelFunc, error) {
@@ -405,14 +480,11 @@ func removeFlagsAndBinFromArgs(hashDelimitedArgs string) string {
 func handleArgs(args []string) ([]string, error) {
 	hashDelimitedArgs := "#" + strings.Join(args, "#") + "#"
 	regexSafeArgs := "#" + removeFlagsAndBinFromArgs(hashDelimitedArgs)
-
-	fmt.Println("The result of remove binary name and flags :", regexSafeArgs)
-
 	httpRegex := regexp.MustCompile(`http#`)
 	httpsRegex := regexp.MustCompile(`https#`)
 	ipRegex := regexp.MustCompile(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}#`)
 	portRegex := regexp.MustCompile(`\d{1,5}#`)
-	tlsRegex := regexp.MustCompile(`#`)
+	tlsRegex := regexp.MustCompile(`(?:(?:[\w\d\s]:)?[\\/][^\\/]*)*\.[a-zA-Z]{3},(?:(?:[\w\d\s]:)?[\\/][^\\/]*)*\.[a-zA-Z]{3}#`)
 	sortedArgs := make([]string, len(args))
 
 	matchInterface := false
@@ -498,7 +570,7 @@ func handleArgs(args []string) ([]string, error) {
 		sortedArgs[2] = ifconfigCIDRTmp
 		sortedArgs[3] = strings.ReplaceAll(strings.Join(ipRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[4] = strings.ReplaceAll(strings.Join(portRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
-		// sortedArgs[5] = TLS
+		sortedArgs[5] = strings.ReplaceAll(strings.Join(tlsRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
 			err := fmt.Errorf("invalid ip and port combination: %s and %s", sortedArgs[3], sortedArgs[4])
 			return nil, err
@@ -535,6 +607,10 @@ func main() {
 	appStartTime := time.Now()
 	args, argsLen := os.Args, len(os.Args)
 
+	// Would it not be nice given my long term openssl syntax memory to just print the instructions for creating certs on each system
+	// https://gist.github.com/denji/12b3a568f092ab951456
+	// Add -c (print certificate commands), -h and -v
+
 	if argsLen > 9 {
 		flag.PrintDefaults()
 		fmt.Println()
@@ -553,10 +629,26 @@ func main() {
 		err = gracefulExit(server, context, contextCancel)
 		checkError(err, 0)
 	case "https":
-		tlsReq, err := validateTLS(sortedArgs[5])
+		tlsCert, tlsKey, err := validateTLS(sortedArgs[5])
 		checkError(err, 0)
 		server, context, contextCancel, err := runHTTPSServer(sortedArgs[:4], tlsReq)
 		checkError(err, 0)
+		cfg := &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		}
+
+		server.TLSConfig = cfg
+		server.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0)
+
+		server.ListenAndServeTLS(tlsCert, tlsKey)
 		err = gracefulExit(server, context, contextCancel)
 		checkError(err, 0)
 	default:

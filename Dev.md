@@ -35,6 +35,14 @@ https://surajincloud.com/difference-between-setting-adding-the-headers-in-http-a
 - canceling
 - read - https://www.digitalocean.com/community/tutorials/how-to-use-contexts-in-go
 
+For all Handlers
+```
+if tls {
+w.Header().Add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+}
+```
+
+
 
 - Make sure I am good https://www.digitalocean.com/community/tutorials/how-to-make-an-http-server-in-go
 
