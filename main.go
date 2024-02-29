@@ -47,14 +47,14 @@ func downloadFileHandler() http.HandlerFunc {
 		checkError(err, 0, 0)
 		if !exists {
 			http.NotFound(w, r)
-			defer log.Printf("Failed to Download file: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
+			defer InfoLogger.Printf("Failed to Download file: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
 		} else {
 			fmt.Printf("Update to go 1.22!")
 			http.ServeFile(w, r, pathToRequestedFile)
 			//http.ServerFileFS(w, r, http.FileSystem, pathToRequestedFile)
-			defer log.Printf("Downloading file at: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
+			defer InfoLogger.Printf("Downloading file at: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
 		}
-		log.Printf("Successfully Downloaded File - %v by %v\n", requestedFile, r.RemoteAddr)
+		InfoLogger.Printf("Successfully Downloaded File - %v by %v\n", requestedFile, r.RemoteAddr)
 	})
 }
 
@@ -62,7 +62,7 @@ func lsTmpDir() {
 	tmpDir := os.TempDir()
 	output, err := os.ReadDir(tmpDir)
 	checkError(err, 0, 0)
-	log.Printf("The contents of the host system's temporary directory: %s", output)
+	InfoLogger.Printf("The contents of the host system's temporary directory: %s", output)
 }
 
 func sha256AFile(filepath string) (result string, err error) {
@@ -154,7 +154,7 @@ func uploadFileHandler() http.HandlerFunc {
 		wd, err := os.Getwd()
 		checkError(err, 0, 0)
 		http.FileServer(http.Dir(tmpDir))
-		log.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
+		InfoLogger.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
 
 		if r.Method != http.MethodPost {
 			writerRespondError(w, "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
@@ -165,11 +165,11 @@ func uploadFileHandler() http.HandlerFunc {
 
 		file, fileHeader, err := r.FormFile("filename")
 		checkError(err, 0, 0)
-		log.Printf("upload requested by %s\n", r.RemoteAddr)
+		InfoLogger.Printf("upload requested by %s\n", r.RemoteAddr)
 		defer file.Close()
 
 		fileSize := fileHeader.Size
-		log.Printf("File size (bytes): %v\n", fileSize)
+		InfoLogger.Printf("File size (bytes): %v\n", fileSize)
 		if fileSize > maxUploadSize {
 			writerRespondError(w, "FILE_TOO_LARGE", http.StatusBadRequest)
 		}
@@ -180,46 +180,46 @@ func uploadFileHandler() http.HandlerFunc {
 		detectedFileType := http.DetectContentType(fileBytes)
 		switch detectedFileType {
 		case "/", "":
-			log.Printf("No file type detected by Go STDLIB http.DetectContentType - first 512 bytes parsed")
-			log.Printf("This section is here in case of modification based of requiring specific file types")
+			InfoLogger.Printf("No file type detected by Go STDLIB http.DetectContentType - first 512 bytes parsed")
+			InfoLogger.Printf("This section is here in case of modification based of requiring specific file types")
 		default:
-			log.Printf("The detected file type by OmniServer's use of go's http.DetectContentType was: %s", detectedFileType)
+			InfoLogger.Printf("The detected file type by OmniServer's use of go's http.DetectContentType was: %s", detectedFileType)
 			writerRespondError(w, "INVALID_FILE_TYPE", http.StatusBadRequest)
 		}
 
 		fileEndings, err := mime.ExtensionsByType(detectedFileType)
 		if err != nil {
-			log.Printf("mime.ExtensionsByType() cannot read %s", fileEndings)
+			InfoLogger.Printf("mime.ExtensionsByType() cannot read %s", fileEndings)
 			writerRespondError(w, "CANT_READ_FILE_TYPE", http.StatusInternalServerError)
 		}
-		log.Printf("FileType: %s, File: %s\n", detectedFileType, fileHeader.Filename)
+		InfoLogger.Printf("FileType: %s, File: %s\n", detectedFileType, fileHeader.Filename)
 		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			log.Printf("Could not parse multipart form: %v\n", err)
+			InfoLogger.Printf("Could not parse multipart form: %v\n", err)
 			writerRespondError(w, "CANT_PARSE_FORM", http.StatusInternalServerError) // DO I want to send errors out - compile flags!
 		}
-		log.Printf("File upload request successfully made by: \n")
-		log.Printf("Uploaded File: %+v\n", fileHeader.Filename)
-		log.Printf("File Size: %+v\n", fileSize)
-		log.Printf("MIME Header: %+v\n", fileEndings)
+		InfoLogger.Printf("File upload request successfully made by: \n")
+		InfoLogger.Printf("Uploaded File: %+v\n", fileHeader.Filename)
+		InfoLogger.Printf("File Size: %+v\n", fileSize)
+		InfoLogger.Printf("MIME Header: %+v\n", fileEndings)
 
 		// Create a temporary file tmp directory that conforms to a naming scheme
-		log.Printf("File upload to temporary file creation started\n")
+		InfoLogger.Printf("File upload to temporary file creation started\n")
 		tempFile, err := os.CreateTemp(tmpDir, "tmp-")
 		checkError(err, 0, 0)
 		defer tempFile.Close()
 		defer os.Remove(tempFile.Name())
-		log.Printf("Successfully uploaded file as a temporary file to %s - %s \n", tmpDir, tempFile.Name())
+		InfoLogger.Printf("Successfully uploaded file as a temporary file to %s - %s \n", tmpDir, tempFile.Name())
 
 		// Reasons for writing to another file is that we can then can byte parser code here to parse the file for something CTFy...
 		// sha256 hashing for the file also adds a layer of checks regarding packet skull hole-pokery that prevent worms to prevent file compromise
-		log.Printf("Attempting to SHA256 hash the file %s/%s and store it the currect working directory of OmniServer - %s \n", tmpDir, tempFile.Name(), wd)
+		InfoLogger.Printf("Attempting to SHA256 hash the file %s/%s and store it the currect working directory of OmniServer - %s \n", tmpDir, tempFile.Name(), wd)
 		currTmpFile := tmpDir + tempFile.Name()
 		fileBytes, err = os.ReadFile(currTmpFile)
 		checkError(err, 0, 0)
 		hashedFilename, err := sha256AFile(currTmpFile) //
 		checkError(err, 0, 0)
-		log.Printf("Successfully hashed %s as %s\n", tempFile.Name(), hashedFilename)
-		log.Printf("Coverting from temporary to regular File - %s to %s - a SHA256\n", tempFile.Name(), hashedFilename)
+		InfoLogger.Printf("Successfully hashed %s as %s\n", tempFile.Name(), hashedFilename)
+		InfoLogger.Printf("Coverting from temporary to regular File - %s to %s - a SHA256\n", tempFile.Name(), hashedFilename)
 		wdAndFilename := wd + hashedFilename
 		err = os.WriteFile(wdAndFilename, fileBytes, 0611)
 		checkError(err, 0, 0)
@@ -229,8 +229,8 @@ func uploadFileHandler() http.HandlerFunc {
 			err := fmt.Errorf("uploaded file does not exist in the work directory as filepath %s", wdAndFilename)
 			checkError(err, 0, 0)
 		}
-		defer log.Printf("Successfully saved uploaded temporary file: %s to %s\n", currTmpFile, wdAndFilename)
-		defer log.Printf("Successfully removed temporary file: %s\n", currTmpFile)
+		defer InfoLogger.Printf("Successfully saved uploaded temporary file: %s to %s\n", currTmpFile, wdAndFilename)
+		defer InfoLogger.Printf("Successfully removed temporary file: %s\n", currTmpFile)
 		defer lsTmpDir()
 	})
 }
@@ -245,13 +245,13 @@ func saveReqBodyFileHandler() http.HandlerFunc {
 		}
 		tmpDir := os.TempDir()
 		http.FileServer(http.Dir(tmpDir))
-		log.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
+		InfoLogger.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
 		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 		tempFile, err := os.CreateTemp(tmpDir, "tmp-")
 		checkError(err, 0, 0)
 		defer tempFile.Close()
 		defer os.Remove(tempFile.Name())
-		log.Printf("Successfully Saved Request Body to File - %s \n", tempFile.Name())
+		InfoLogger.Printf("Successfully Saved Request Body to File - %s \n", tempFile.Name())
 		fullTempFilePath := tmpDir + tempFile.Name()
 		hashedFilename, err := sha256AFile(fullTempFilePath)
 		checkError(err, 0, 0)
@@ -263,7 +263,7 @@ func saveReqBodyFileHandler() http.HandlerFunc {
 		checkError(err, 0, 0)
 		err = os.WriteFile(fullPathWithExt, fileBytes, 0611)
 		checkError(err, 0, 0)
-		defer log.Printf("Saved Request Body to a finalize hashed filename at %s\n", fullPathWithExt)
+		defer InfoLogger.Printf("Saved Request Body to a finalize hashed filename at %s\n", fullPathWithExt)
 	})
 }
 
@@ -307,7 +307,7 @@ func trimFilePath(path string) (result string, err error) {
 }
 
 func validateTLS(args string) (string, string, error) {
-	log.Printf("Attempt to validate TLS arguments %s\n", args)
+	InfoLogger.Printf("Attempt to validate TLS arguments %s\n", args)
 	var tlsCert, tlsKey, certPath, keyPath string
 	os := runtime.GOOS
 	argsSlice := strings.SplitAfter(args, ",")
@@ -319,12 +319,12 @@ func validateTLS(args string) (string, string, error) {
 	}
 
 	if keyPath == "" {
-		err := fmt.Errorf("no private key file in user provided args: $%s", args)
+		err := fmt.Errorf("no private key file in user provided args: %s", args)
 		checkError(err, 0, 0)
 		return "", "", err
 	}
 	if certPath == "" {
-		err := fmt.Errorf("assignment of private key and some certificate file not found in args: $%s", args)
+		err := fmt.Errorf("assignment of private key and some certificate file not found in args: %s", args)
 		checkError(err, 0, 0)
 		return "", "", err
 	}
@@ -370,7 +370,7 @@ func validateTLS(args string) (string, string, error) {
 
 func gracefulExit(server *http.Server, context context.Context, cancel context.CancelFunc) error {
 	fmt.Printf("SIG THIS or something fanciy please with: %+v, %+v, %+v\n", server, context, cancel)
-	log.Printf("attempt to graceful shutdown server: %+v", server)
+	InfoLogger.Printf("attempt to graceful shutdown server: %+v", server)
 	cancel()
 	<-context.Done()
 	// ServerTerminationTime := time.Now()
@@ -389,10 +389,10 @@ func prependColonToPortNumber(port string) string {
 func checkError(err error, errorLevel, errorCode int) {
 	switch errorLevel {
 	case 0:
-		WarningLogger("error code %v:%s", errorCode, err)
+		WarningLogger.Printf("error code %v:%s", errorCode, err)
 		return
 	case 1:
-		ErrorCode("error code %v:%s", errorCode, err)
+		ErrorLogger.Printf("error code %v:%s", errorCode, err)
 		log.Fatal(err)
 	}
 }
@@ -574,8 +574,10 @@ func printTotalRuntime(appStartTime time.Time) {
 	appTerminateTime := time.Now()
 	totalRuntime := 0
 	// Do the mathematics idiot
-	log.Printf("Application started: %v - Terminated: %v - Runtime: %v\n", appStartTime, appTerminateTime, totalRuntime)
+	InfoLogger.Printf("Application started: %v - Terminated: %v - Runtime: %v\n", appStartTime, appTerminateTime, totalRuntime)
 }
+
+var InfoLogger, WarningLogger, ErrorLogger *log.Logger
 
 func main() {
 	printBanner()
@@ -598,9 +600,9 @@ func main() {
 	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
 	checkError(err, 0, 0)
 
-	InfoLogger := log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	WarningLogger := log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger := log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	// Would it not be nice given my long term openssl syntax memory to just print the instructions for creating certs on each system
 	// https://gist.github.com/denji/12b3a568f092ab951456
@@ -619,17 +621,17 @@ func main() {
 
 	switch sortedArgs[0] {
 	case "http":
-		log.Printf("--- Building HTTP Server ---\n")
+		InfoLogger.Printf("--- Building HTTP Server ---\n")
 		httpServer, ctx, cancelCtx, err := initServerContext(sortedArgs[4], sortedArgs[3])
 		checkError(err, 0, 0)
-		log.Printf("--- Server Built for %v created ---\n", httpServer)
+		InfoLogger.Printf("--- Server Built for %v created ---\n", httpServer)
 		checkError(err, 0, 0)
 		err = gracefulExit(httpServer, ctx, cancelCtx)
 		checkError(err, 0, 0)
 	case "https":
 		tlsCert, tlsKey, err := validateTLS(sortedArgs[5])
 		checkError(err, 0, 0)
-		log.Printf("--- Building HTTPS Server ---\n")
+		InfoLogger.Printf("--- Building HTTPS Server ---\n")
 		httpsServer, ctx, cancelCtx, err := initServerContext(sortedArgs[4], sortedArgs[3])
 		checkError(err, 0, 0)
 		cfg := &tls.Config{
@@ -646,7 +648,7 @@ func main() {
 
 		httpsServer.TLSConfig = cfg
 		httpsServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0)
-		log.Printf("--- Server Built for %v created ---\n", httpsServer)
+		InfoLogger.Printf("--- Server Built for %v created ---\n", httpsServer)
 		httpsServer.ListenAndServeTLS(tlsCert, tlsKey)
 		err = gracefulExit(httpsServer, ctx, cancelCtx)
 		checkError(err, 0, 0)
