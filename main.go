@@ -19,6 +19,26 @@ import (
 	"time"
 )
 
+// Compile prepreprocessor to prevent use log gostd 
+// And this function
+func initaliseLogging() error {
+	now := time.Now().UTC()
+	dateFormatted := now.Format("2006-01-01")
+	nameBuilder := strings.Builder{}
+	nameBuilder.WriteString(dateFormatted)
+	nameBuilder.WriteString(".log")
+	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	return nil
+}
+
 type ctxKey struct{}
 
 func downloadFileHandler() http.HandlerFunc {
