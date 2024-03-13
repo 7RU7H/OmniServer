@@ -27,11 +27,13 @@ func downloadFileHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var requestedFile string
 		wd, err := os.Getwd()
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 68)
+		}
 		if r.Method != http.MethodGet {
 			writerRespondError(w, "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
 			err := fmt.Errorf("incorrect method used %s", r.Method)
-			checkError(err, 0, 0)
+			checkError(err, 1, 69)
 			return
 		}
 		r.Header.Add("File", "")
@@ -40,11 +42,11 @@ func downloadFileHandler() http.HandlerFunc {
 			requestedFile = r.Header.Get("File")
 		} else {
 			err := fmt.Errorf("empty file header from %s", r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 1, 70)
 		}
 		pathToRequestedFile := wd + requestedFile
 		exists, err := checkFileExists(pathToRequestedFile)
-		checkError(err, 0, 0)
+		checkError(err, 1, 71)
 		if !exists {
 			http.NotFound(w, r)
 			defer InfoLogger.Printf("Failed to Download file: %v - requested by: %v\n", requestedFile, r.RemoteAddr)
@@ -61,7 +63,7 @@ func downloadFileHandler() http.HandlerFunc {
 func lsTmpDir() {
 	tmpDir := os.TempDir()
 	output, err := os.ReadDir(tmpDir)
-	checkError(err, 0, 0)
+	checkError(err, 1, 67)
 	InfoLogger.Printf("The contents of the host system's temporary directory: %s", output)
 }
 
@@ -71,20 +73,20 @@ func sha256AFile(filepath string) (result string, err error) {
 	case "windows":
 		cmd := exec.Command("certutil.exe", "-hashfile", filepath, "SHA256")
 		output, err := cmd.CombinedOutput()
-		checkError(err, 0, 0)
+		checkError(err, 1, 64)
 		outputAsString := string(output)
 		outputSlice := strings.Split(outputAsString, "\n")
 		result = outputSlice[1]
 	case "linux":
 		cmd := exec.Command("sha256sum", "", filepath)
 		output, err := cmd.CombinedOutput()
-		checkError(err, 0, 0)
+		checkError(err, 1, 65)
 		outputAsString := string(output)
 		outputSlice := strings.Split(outputAsString, " ")
 		result = outputSlice[0]
 	default:
 		err := fmt.Errorf("the local os %s is unsupported for hashing files with sha256", os)
-		checkError(err, 0, 0)
+		checkError(err, 1, 66)
 	}
 	return result, nil
 }
@@ -95,7 +97,7 @@ func reverseShellHandler() http.HandlerFunc {
 		if r.Method != http.MethodPost {
 			writerRespondError(w, "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
 			err := fmt.Errorf("incorrect method used %s by %s", r.Method, r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 1, 59)
 			return
 		}
 
@@ -107,22 +109,24 @@ func reverseShellHandler() http.HandlerFunc {
 			shell = r.Header.Get("Shell")
 		} else {
 			err := fmt.Errorf("empty shell header from %s", r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 1, 60)
 		}
 		if r.Header.Get("File") != "" {
 			args = r.Header.Get("Args")
 		} else {
 			err := fmt.Errorf("empty args header from %s", r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 1, 61)
 		}
 		if r.Header.Get("File") != "" {
 			payload = r.Header.Get("Payload")
 		} else {
 			err := fmt.Errorf("empty payload header from %s", r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 1, 62)
 		}
 		err := reverseShell(shell, args, payload, r.RemoteAddr)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 63)
+		}
 	})
 }
 
@@ -132,39 +136,42 @@ func reverseShell(shell, args, payload, remoteAddr string) (err error) {
 	case "windows":
 		cmd := exec.Command(shell, args, payload)
 		err := cmd.Run()
-		checkError(err, 0, 0)
+		checkError(err, 1, 56)
 		return nil
 	case "linux":
 		cmd := exec.Command(shell, args, payload)
 		err := cmd.Run()
-		checkError(err, 0, 0)
+		checkError(err, 1, 57)
 		return nil
 	default:
 		err := fmt.Errorf("the provided shell: %s ---- args: %s ---- payload: %s ---- were provided by %s incorrectly in some way", shell, args, payload, remoteAddr)
-		checkError(err, 0, 0)
+		checkError(err, 1, 58)
 	}
 	return err
 }
 
-// TODO - Thinking about errors
 func uploadFileHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var maxUploadSize int64 = 10 * 1024 // 10 Mb
 		tmpDir := os.TempDir()
 		wd, err := os.Getwd()
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 47)
+		}
 		http.FileServer(http.Dir(tmpDir))
 		InfoLogger.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
 
 		if r.Method != http.MethodPost {
 			writerRespondError(w, "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
 			err := fmt.Errorf("incorrect method used %s from %s ", r.Method, r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 1, 48)
 			return
 		}
 
 		file, fileHeader, err := r.FormFile("filename")
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 49)
+		}
 		InfoLogger.Printf("upload requested by %s\n", r.RemoteAddr)
 		defer file.Close()
 
@@ -175,8 +182,9 @@ func uploadFileHandler() http.HandlerFunc {
 		}
 
 		fileBytes, err := io.ReadAll(file)
-		checkError(err, 0, 0)
-
+		if err != nil {
+			checkError(err, 1, 50)
+		}
 		detectedFileType := http.DetectContentType(fileBytes)
 		switch detectedFileType {
 		case "/", "":
@@ -205,7 +213,9 @@ func uploadFileHandler() http.HandlerFunc {
 		// Create a temporary file tmp directory that conforms to a naming scheme
 		InfoLogger.Printf("File upload to temporary file creation started\n")
 		tempFile, err := os.CreateTemp(tmpDir, "tmp-")
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 51)
+		}
 		defer tempFile.Close()
 		defer os.Remove(tempFile.Name())
 		InfoLogger.Printf("Successfully uploaded file as a temporary file to %s - %s \n", tmpDir, tempFile.Name())
@@ -215,19 +225,25 @@ func uploadFileHandler() http.HandlerFunc {
 		InfoLogger.Printf("Attempting to SHA256 hash the file %s/%s and store it the currect working directory of OmniServer - %s \n", tmpDir, tempFile.Name(), wd)
 		currTmpFile := tmpDir + tempFile.Name()
 		fileBytes, err = os.ReadFile(currTmpFile)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 52)
+		}
+
 		hashedFilename, err := sha256AFile(currTmpFile) //
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 53)
+		}
 		InfoLogger.Printf("Successfully hashed %s as %s\n", tempFile.Name(), hashedFilename)
 		InfoLogger.Printf("Coverting from temporary to regular File - %s to %s - a SHA256\n", tempFile.Name(), hashedFilename)
 		wdAndFilename := wd + hashedFilename
 		err = os.WriteFile(wdAndFilename, fileBytes, 0611)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 54)
+		}
 		exists, err := checkFileExists(wdAndFilename)
-		checkError(err, 0, 0)
-		if !exists {
+		if !exists || err != nil {
 			err := fmt.Errorf("uploaded file does not exist in the work directory as filepath %s", wdAndFilename)
-			checkError(err, 0, 0)
+			checkError(err, 1, 55)
 		}
 		defer InfoLogger.Printf("Successfully saved uploaded temporary file: %s to %s\n", currTmpFile, wdAndFilename)
 		defer InfoLogger.Printf("Successfully removed temporary file: %s\n", currTmpFile)
@@ -240,7 +256,7 @@ func saveReqBodyFileHandler() http.HandlerFunc {
 		if r.Method != http.MethodPost {
 			writerRespondError(w, "METHOD_NOT_ALLOWED", http.StatusMethodNotAllowed)
 			err := fmt.Errorf("incorrect method used %s by %s", r.Method, r.RemoteAddr)
-			checkError(err, 0, 0)
+			checkError(err, 0, 41)
 			return
 		}
 		tmpDir := os.TempDir()
@@ -248,21 +264,30 @@ func saveReqBodyFileHandler() http.HandlerFunc {
 		InfoLogger.Printf("Temporary File server started at %s for uploading files\n", tmpDir)
 		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 		tempFile, err := os.CreateTemp(tmpDir, "tmp-")
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 42)
+		}
 		defer tempFile.Close()
 		defer os.Remove(tempFile.Name())
 		InfoLogger.Printf("Successfully Saved Request Body to File - %s \n", tempFile.Name())
 		fullTempFilePath := tmpDir + tempFile.Name()
 		hashedFilename, err := sha256AFile(fullTempFilePath)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 43)
+		}
 		wd, err := os.Getwd()
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 44)
+		}
 		fullPathWithExt := wd + hashedFilename + ".req"
-		checkError(err, 0, 0)
 		fileBytes, err := os.ReadFile(fullTempFilePath)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 45)
+		}
 		err = os.WriteFile(fullPathWithExt, fileBytes, 0611)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 46)
+		}
 		defer InfoLogger.Printf("Saved Request Body to a finalize hashed filename at %s\n", fullPathWithExt)
 	})
 }
@@ -300,7 +325,7 @@ func trimFilePath(path string) (result string, err error) {
 		result = pathSlice[len(pathSlice)-1]
 	default:
 		err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", os)
-		checkError(err, 0, 0)
+		checkError(err, 2, 39)
 		return "", err
 	}
 	return result, err
@@ -320,48 +345,58 @@ func validateTLS(args string) (string, string, error) {
 
 	if keyPath == "" {
 		err := fmt.Errorf("no private key file in user provided args: %s", args)
-		checkError(err, 0, 0)
+		checkError(err, 1, 21)
 		return "", "", err
 	}
 	if certPath == "" {
 		err := fmt.Errorf("assignment of private key and some certificate file not found in args: %s", args)
-		checkError(err, 0, 0)
+		checkError(err, 1, 22)
 		return "", "", err
 	}
 
 	keyExists, err := checkFileExists(keyPath)
-	checkError(err, 0, 0)
+	if !keyExists || err != nil {
+		checkError(err, 1, 23)
+	}
 	certExists, err := checkFileExists(certPath)
-	checkError(err, 0, 0)
+	if !certExists || err != nil {
+		checkError(err, 1, 24)
+	}
 	keyAndCertExist := keyExists && certExists
 	if !keyAndCertExist {
 		err := fmt.Errorf("either private key or certificate does not exist on the file system")
-		checkError(err, 0, 0)
+		checkError(err, 2, 25)
 		return "", "", err
 	}
 	tlsKey, err = trimFilePath(keyPath)
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 1, 26)
+	}
 
 	switch os {
 	case "windows":
 		tlsCert, err = trimFilePath(certPath)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 27)
+		}
 		if !(strings.Contains(tlsCert, ".cer") || strings.Contains(tlsCert, ".pem")) {
 			err := fmt.Errorf("invalid certificate file extension %s for os: %s", tlsCert, os)
-			checkError(err, 0, 0)
+			checkError(err, 1, 28)
 			return "", "", err
 		}
 	case "linux":
 		tlsCert, err = trimFilePath(certPath)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 29)
+		}
 		if !(strings.Contains(tlsCert, ".crt") || strings.Contains(tlsCert, ".pem")) {
 			err := fmt.Errorf("invalid certificate file extension %s for os: %s", tlsCert, os)
-			checkError(err, 0, 0)
+			checkError(err, 1, 29)
 			return "", "", err
 		}
 	default:
 		err := fmt.Errorf("invalid certificate arguments provided - no .crt,.pem or .cer found: %s", args)
-		checkError(err, 0, 0)
+		checkError(err, 2, 31)
 		return "", "", err
 	}
 
@@ -389,10 +424,16 @@ func prependColonToPortNumber(port string) string {
 func checkError(err error, errorLevel, errorCode int) {
 	switch errorLevel {
 	case 0:
-		WarningLogger.Printf("error code %v:%s", errorCode, err)
+		InfoLogger.Printf("test passed - error code:%v", errorCode)
 		return
 	case 1:
+		WarningLogger.Printf("error code %v:%s", errorCode, err)
+		return
+	case 2:
 		ErrorLogger.Printf("error code %v:%s", errorCode, err)
+		log.Fatal(err)
+	default:
+		err := fmt.Errorf("incorrect errorlevel integer: %v by errorcode: %v", errorLevel, errorCode)
 		log.Fatal(err)
 	}
 }
@@ -406,9 +447,9 @@ func writerRespondError(w http.ResponseWriter, message string, statusCode int) {
 // TODO This is not connected to the design - fix
 func checkFileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
-	checkError(err, 0, 0)
+	checkError(err, 1, 37)
 	if os.IsNotExist(err) {
-		checkError(err, 0, 0)
+		checkError(err, 1, 38)
 		return false, err
 	}
 	return true, nil
@@ -416,7 +457,9 @@ func checkFileExists(path string) (bool, error) {
 
 func checkValidPort(portStr string) bool {
 	portInt, err := strconv.Atoi(strings.ReplaceAll(portStr, ":", ""))
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 1, 36)
+	}
 	if portInt <= 65535 && portInt > -1 {
 		return true
 	}
@@ -443,7 +486,9 @@ func checkValidIP(ip string) bool {
 
 func convIfconfigNameToCIDR(ifconfig *net.Interface) (string, error) {
 	addrs, err := ifconfig.Addrs()
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 2, 35)
+	}
 	for _, addr := range addrs {
 		if ipNet, ok := addr.(*net.IPNet); ok {
 			return ipNet.String(), nil
@@ -473,21 +518,26 @@ func handleArgs(args []string) ([]string, error) {
 
 	matchInterface := false
 	matchIP, err := regexp.MatchString(ipRegex.String(), regexSafeArgs)
-	checkError(err, 0, 0)
+	if !matchIP {
+		checkError(err, 1, 1)
+	}
 	matchPort, err := regexp.MatchString(portRegex.String(), regexSafeArgs)
-	checkError(err, 0, 0)
-
+	if !matchPort {
+		checkError(err, 1, 2)
+	}
 	if len(args) != 11 {
 		matchHTTP, err := regexp.MatchString(httpRegex.String(), regexSafeArgs)
-		checkError(err, 0, 0)
+		if !matchHTTP {
+			checkError(err, 1, 3)
+		}
 		interfaces, err := net.Interfaces()
-		checkError(err, 0, 0)
-
+		if err != nil {
+			checkError(err, 1, 4)
+		}
 		tmpReduced := httpRegex.ReplaceAllString(regexSafeArgs, "")
 		tmpReduced = ipRegex.ReplaceAllString(tmpReduced, "")
 		tmpReduced = portRegex.ReplaceAllString(tmpReduced, "")
 		interfaceArg := strings.ReplaceAll(tmpReduced, "#", "")
-		fmt.Println(interfaceArg)
 		for _, i := range interfaces {
 			if i.Name == interfaceArg {
 				matchInterface = true
@@ -495,15 +545,19 @@ func handleArgs(args []string) ([]string, error) {
 		}
 		if !matchInterface {
 			err := fmt.Errorf("there is no interface named: %s", interfaceArg)
-			checkError(err, 0, 0)
+			checkError(err, 2, 5) // Interface selection is critical!
 		}
 		ifconfig, err := net.InterfaceByName(interfaceArg)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 6)
+		}
 		ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig)
-		checkError(err, 0, 0)
+		if err != nil || ifconfigCIDRTmp == "" || !strings.Contains(ifconfigCIDRTmp, "/") { // How many checks really matter?
+			checkError(err, 1, 7)
+		}
 		httpAllMatched := matchHTTP && matchIP && matchPort
 		if !httpAllMatched {
-			err := fmt.Errorf("arguments provided are %v: %v", httpAllMatched, args)
+			err := fmt.Errorf("incorrect arguments provided for a http server are %v: %v", httpAllMatched, args)
 			return nil, err
 		}
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
@@ -514,16 +568,20 @@ func handleArgs(args []string) ([]string, error) {
 
 		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
 			err := fmt.Errorf("invalid ip and port combination: %s and %s", sortedArgs[3], sortedArgs[4])
-			return nil, err
+			checkError(err, 2, 8)
 		}
-		checkError(err, 0, 0)
+
 		return sortedArgs, nil
 
 	} else {
 		matchHTTPS, err := regexp.MatchString(httpsRegex.String(), regexSafeArgs)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 9)
+		}
 		interfaces, err := net.Interfaces()
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 10)
+		}
 		tmpReduced := httpRegex.ReplaceAllString(regexSafeArgs, "")
 		tmpReduced = ipRegex.ReplaceAllString(tmpReduced, "")
 		tmpReduced = portRegex.ReplaceAllString(tmpReduced, "")
@@ -536,18 +594,24 @@ func handleArgs(args []string) ([]string, error) {
 		}
 		if !matchInterface {
 			err := fmt.Errorf("there is no interface named: %s", interfaceArg)
-			checkError(err, 0, 0)
+			checkError(err, 2, 11)
 		}
 		ifconfig, err := net.InterfaceByName(interfaceArg)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 12)
+		}
 		ifconfigCIDRTmp, err := convIfconfigNameToCIDR(ifconfig)
-		checkError(err, 0, 0)
+		if err != nil || ifconfigCIDRTmp == "" || !strings.Contains(ifconfigCIDRTmp, "/") { // How many checks really matter?
+			checkError(err, 1, 13)
+		}
 		matchTLS, err := regexp.MatchString(tlsRegex.String(), regexSafeArgs)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 14)
+		}
 		httpsAllMatched := matchHTTPS && matchIP && matchPort && matchTLS && matchInterface
 		if !httpsAllMatched {
 			err := fmt.Errorf("arguments provided are %v: %v", httpsAllMatched, args)
-			return nil, err
+			checkError(err, 2, 15)
 		}
 		sortedArgs[0] = strings.ReplaceAll(strings.Join(httpRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		sortedArgs[1] = interfaceArg
@@ -557,17 +621,16 @@ func handleArgs(args []string) ([]string, error) {
 		sortedArgs[5] = strings.ReplaceAll(strings.Join(tlsRegex.FindAllString(regexSafeArgs, 1), ""), "#", "")
 		if !(checkValidIP(sortedArgs[3]) && checkValidPort(sortedArgs[4])) {
 			err := fmt.Errorf("invalid ip and port combination: %s and %s", sortedArgs[3], sortedArgs[4])
-			return nil, err
+			checkError(err, 2, 16)
 		}
-		checkError(err, 0, 0)
 		return sortedArgs, nil
 	}
 }
 
 func printBanner() {
-	fmt.Printf("Flashy nice colorful banner with lots of 💀s")
+	fmt.Printf("Flashy nice colorful banner with lots of 💀s\n")
 	fmt.Printf("Beware this program uses http.ServeFileFS() visit https://pkg.go.dev/net/http#ServeFileFS - meaning that ANY file can be downloaded if requested and exists\n")
-	fmt.Printf("💀 ...This Program is for CTFs - Happy Hacking :) ... 💀")
+	fmt.Printf("💀 ...This Program is for CTFs - Happy Hacking :) ... 💀\n")
 }
 
 func printTotalRuntime(appStartTime time.Time) {
@@ -597,12 +660,10 @@ func main() {
 	nameBuilder := strings.Builder{}
 	nameBuilder.WriteString(dateFormatted)
 	nameBuilder.WriteString(".log")
-	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
-	checkError(err, 0, 0)
 
-	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	// Would it not be nice given my long term openssl syntax memory to just print the instructions for creating certs on each system
 	// https://gist.github.com/denji/12b3a568f092ab951456
@@ -617,23 +678,32 @@ func main() {
 	}
 
 	sortedArgs, err := handleArgs(args)
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 2, 17)
+	}
 
 	switch sortedArgs[0] {
 	case "http":
 		InfoLogger.Printf("--- Building HTTP Server ---\n")
 		httpServer, ctx, cancelCtx, err := initServerContext(sortedArgs[4], sortedArgs[3])
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 18)
+		}
 		InfoLogger.Printf("--- Server Built for %v created ---\n", httpServer)
-		checkError(err, 0, 0)
+		// Run http.ListenAndServe
+		checkError(err, 2, 19)
 		err = gracefulExit(httpServer, ctx, cancelCtx)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 20)
+		}
 	case "https":
 		tlsCert, tlsKey, err := validateTLS(sortedArgs[5])
-		checkError(err, 0, 0)
+		checkError(err, 2, 32)
 		InfoLogger.Printf("--- Building HTTPS Server ---\n")
 		httpsServer, ctx, cancelCtx, err := initServerContext(sortedArgs[4], sortedArgs[3])
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 33)
+		}
 		cfg := &tls.Config{
 			MinVersion:               tls.VersionTLS12,
 			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -651,10 +721,12 @@ func main() {
 		InfoLogger.Printf("--- Server Built for %v created ---\n", httpsServer)
 		httpsServer.ListenAndServeTLS(tlsCert, tlsKey)
 		err = gracefulExit(httpsServer, ctx, cancelCtx)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 34)
+		}
 	default:
 		err := fmt.Errorf("invalid sorted arguments and proof at index 0: %s", sortedArgs[0])
-		checkError(err, 0, 0)
+		checkError(err, 2, 35)
 	}
 
 	printTotalRuntime(appStartTime)
