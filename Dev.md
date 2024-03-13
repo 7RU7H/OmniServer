@@ -1,5 +1,12 @@
 # Dev 
 
+1. Finalise 
+ - DebugLogger
+ - http.ServeAndListen
+ - gracefulExit 
+2. Debug and Test
+3. Add some nice features like Authentication, and anything else that would make it functionally good for CTFs
+
 ## Thanks to 
 
 https://github.com/mayth/go-simple-upload-server/blob/v2/pkg/server.go
